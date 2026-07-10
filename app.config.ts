@@ -1,5 +1,8 @@
 import { ConfigContext, ExpoConfig } from 'expo/config';
 
+/** iOS bundle ID + Android applicationId (register in Apple Developer / Google Play). */
+const APP_ID = 'au.enginelabs.sidequest';
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Side Quest',
@@ -11,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'dark',
   ios: {
     supportsTablet: false,
-    bundleIdentifier: 'com.sidequest.app',
+    bundleIdentifier: APP_ID,
     infoPlist: {
       NSLocationWhenInUseUsageDescription:
         'Side Quest uses your location to verify you are within 1km of a venue before check-in.',
@@ -20,7 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
-    package: 'com.sidequest.app',
+    package: APP_ID,
     adaptiveIcon: {
       backgroundColor: '#0f0f14',
       foregroundImage: './assets/images/android-icon-foreground.png',

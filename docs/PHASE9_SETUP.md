@@ -64,11 +64,11 @@ supabase migration list --linked   # 6 migrations, Local = Remote
 
 1. OAuth consent screen
 2. Credentials: Web, iOS, Android clients
-3. Add bundle ID `com.sidequest.app` and Android package + SHA-1 for EAS builds
+3. Add bundle ID `au.enginelabs.sidequest` and Android package + SHA-1 for EAS builds
 
 ## 4. Apple Developer (manual, iOS)
 
-1. Enable Sign in with Apple on App ID `com.sidequest.app`
+1. Register App ID `au.enginelabs.sidequest` → enable Sign in with Apple
 2. Create Services ID and key for Supabase Apple provider
 
 ## 5. Live validation (after push + auth)

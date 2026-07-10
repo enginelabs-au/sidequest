@@ -10,7 +10,7 @@ Venue-anchored social discovery — see who's here, right now. Invisible by defa
 
 ## Configuration
 
-App config lives in [`app.config.ts`](app.config.ts), not `app.json`. It defines bundle IDs (`com.sidequest.app`), OAuth scheme (`sidequest`), and location permission strings. Verify with:
+App config lives in [`app.config.ts`](app.config.ts), not `app.json`. It defines bundle IDs (`au.enginelabs.sidequest`), OAuth scheme (`sidequest`), and location permission strings. Verify with:
 
 ```bash
 npx expo config --type public

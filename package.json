@@ -39,7 +39,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "db:types": "supabase gen types typescript --linked > types/database.generated.ts",
-    "verify:env": "bash scripts/verify-env.sh"
+    "verify:env": "bash scripts/verify-env.sh",
+    "verify:connections": "bash scripts/verify-connections.sh"
   },
   "private": true
 }

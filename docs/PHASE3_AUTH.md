@@ -36,20 +36,36 @@ Canonical redirect path is defined in [lib/auth.ts](../lib/auth.ts) as `auth/cal
 
 1. Supabase Dashboard → **Authentication → Providers → Phone**
 2. Enable Phone provider
-3. Configure SMS (Twilio) or use Supabase test numbers for development
+3. Configure SMS via **Twilio** (below) or use Supabase test numbers for development
 4. In app: **Continue with phone** → E.164 format (`+61412345678`)
+
+### Twilio + Supabase Phone (production SMS)
+
+Twilio credentials go in the **Supabase Dashboard only** — not in the mobile `.env`.
+
+1. [Twilio Console](https://console.twilio.com/) → copy **Account SID** (`AC…`) and **Auth Token** from the project home dashboard.
+2. **Messaging Service SID** (`MG…`):
+   - **If you already have one:** Console → **Messaging** → **Services** → click your service → **Properties** → **Messaging Service SID** (starts with `MG`).
+   - **If you need one:** **Messaging** → **Services** → **Create Messaging Service** → name it (e.g. `Side Quest OTP`) → add your Twilio phone number as sender → finish → copy the **SID** from the service overview.
+3. Supabase → **Authentication → Providers → Phone** → enable Twilio and paste:
+   - Twilio Account SID
+   - Twilio Auth Token
+   - Twilio Message Service SID (`MG…`)
+4. Save. Send a test OTP from the app with a real E.164 number (`+61…`).
+
+**Note:** A bare Twilio phone number alone is not the Messaging Service SID. Supabase expects the `MG…` service SID for reliable OTP delivery.
 
 ## Google OAuth
 
 1. [Google Cloud Console](https://console.cloud.google.com/) → OAuth 2.0 credentials
 2. Create **Web client** — copy Client ID to `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
 3. Supabase Dashboard → **Authentication → Providers → Google** — paste Web client ID + secret
-4. For store builds: add iOS bundle ID `com.sidequest.app` and Android package + SHA-1 (see [PHASE9_SETUP.md](./PHASE9_SETUP.md))
+4. For store builds: add iOS bundle ID `au.enginelabs.sidequest` and Android package + SHA-1 (see [PHASE9_SETUP.md](./PHASE9_SETUP.md))
 5. In app: **Continue with Google** — opens browser, returns via `sidequest://auth/callback`
 
 ## Apple Sign In (iOS)
 
-1. Apple Developer → enable Sign in with Apple on App ID `com.sidequest.app`
+1. Apple Developer → register App ID `au.enginelabs.sidequest` → enable Sign in with Apple
 2. Create Services ID and key for Supabase Apple provider
 3. Supabase Dashboard → **Authentication → Providers → Apple** — configure Services ID, secret key, bundle ID
 4. MVP uses **browser OAuth** via `signInWithOAuth({ provider: 'apple' })`, not native `expo-apple-authentication`

@@ -59,6 +59,11 @@ for var in EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_PRIVACY_POLICY_URL EXPO_
   fi
 done
 
+if grep -qE '^EXPO_PUBLIC_.*SECRET=' .env 2>/dev/null; then
+  echo "FAIL: EXPO_PUBLIC_*SECRET in .env — remove; use Supabase Dashboard for OAuth secrets"
+  missing=1
+fi
+
 echo ""
 echo "--- Expo public config ---"
 if command -v npx >/dev/null 2>&1; then

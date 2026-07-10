@@ -39,7 +39,7 @@ Create `/Users/camdouglas/sidequest/.env` — **never commit this file**.
 
 | Setting | Required for | Notes |
 |---------|--------------|-------|
-| Auth → Phone provider | Phase 3 live (recommended first) | Twilio or Supabase test SMS |
+| Auth → Phone provider | Phase 3 live (recommended first) | Twilio in Dashboard — see [PHASE3_AUTH](./PHASE3_AUTH.md) § Twilio |
 | Auth → Google provider | Google sign-in | Web client ID + secret from Google Cloud |
 | Auth → Apple provider | Apple sign-in (iOS) | Services ID + key from Apple Developer |
 | Auth → Redirect URLs | All OAuth | `sidequest://auth/callback` + Expo dev URI ([PHASE3_AUTH](./PHASE3_AUTH.md)) |
@@ -55,14 +55,15 @@ supabase login   # opens browser — agent needs this session to push
 ## Agent will run (after `.env` exists)
 
 Run `npm run verify:env` first — must print `READY for supabase link + db push`.
+Run `npm run verify:connections` — Supabase REST/Auth, DB smoke, legal URL reachability.
 
-- [ ] ⏳ `supabase link --project-ref <ref> --yes`
-- [ ] ⏳ `supabase db push --linked --yes`
-- [ ] ⏳ `supabase db execute -f supabase/seed.sql --linked`
-- [ ] ⏳ `supabase migration list --linked` — 6 migrations, Local = Remote
-- [ ] ⏳ Run `phase2_smoke.sql` + `phase9_rls_probe.sql` in SQL Editor (you or agent reports results)
-- [ ] ⏳ `npm run db:types` (optional type diff)
-- [ ] ⏳ `npm start` — confirm config banners gone in app
+- [x] `supabase link --project-ref <ref> --yes`
+- [x] `supabase db push --linked --yes`
+- [x] Seed venues (psql or SQL Editor — `supabase seed --linked` has no SQL subcommand on CLI 2.53)
+- [x] `supabase migration list --linked` — migrations synced (incl. legacy `20260709064007`)
+- [x] Postgres smoke — 5 tables + 3 RPCs + 5 venues
+- [x] `npm run db:types` (optional type diff)
+- [ ] ⏳ `npm start` — live auth + venue E2E on device/simulator
 
 ---
 
