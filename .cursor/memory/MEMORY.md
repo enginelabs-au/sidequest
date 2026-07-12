@@ -27,7 +27,8 @@ Use user-run steps only when:
 - **Env / launch:** `docs/FINAL_CHECKLIST.md`, `docs/PHASE9_SETUP.md`, `docs/PHASE9_LAUNCH.md`, `scripts/verify-env.sh`, `.env.example`
 - **Schema:** `supabase/migrations/` (profiles, venues, check_ins, connections, blocks, messages, reports, RLS, RPCs)
 - **Maps / Social Radar:** `docs/GOOGLE_MAPS_SETUP.md`; Places via Edge Function `places-search` + secret `GOOGLE_MAPS_PLACES_API_KEY`; native keys `GOOGLE_MAPS_IOS_API_KEY`, `GOOGLE_MAPS_ANDROID_API_KEY`.
-- **Remote DB:** not linked yet — user creates Supabase project + `.env`; then `npm run verify:env` → `db push`
+- **Native auth (Google/Apple/phone):** `docs/PHASE3_AUTH.md`, `docs/ANDROID_GOOGLE_AUTH.md`. Env: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`. Supabase Google authorized IDs = Web + iOS + Android (comma-separated in `external_google_client_id`). Patch: `bash scripts/patch-supabase-native-auth.sh`. Verify: `npm run test:oauth`.
+- **Remote DB:** linked project `xzfxkybnjzlpguespkco`; `npm run verify:env` → `db push`
 
 ## Primary working memory role
 

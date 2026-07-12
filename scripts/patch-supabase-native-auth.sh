@@ -28,12 +28,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
-  source <(grep -E '^(EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID|EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID|APPLE_SERVICES_CLIENT_ID)=' "$ROOT/.env" | sed 's/\r$//')
+  source <(grep -E '^(EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID|EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID|EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID|APPLE_SERVICES_CLIENT_ID)=' "$ROOT/.env" | sed 's/\r$//')
   set +a
 fi
 
 WEB_ID="${EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID:-}"
 IOS_ID="${EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID:-}"
+ANDROID_ID="${EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID:-}"
 APPLE_BUNDLE="au.enginelabs.sidequest"
 APPLE_SERVICES="${APPLE_SERVICES_CLIENT_ID:-au.enginelabs.sidequest.web}"
 APPLE_CLIENT_IDS="${APPLE_BUNDLE},${APPLE_SERVICES}"
@@ -45,9 +46,14 @@ fi
 
 GOOGLE_AUTH_IDS="$WEB_ID"
 if [[ -n "$IOS_ID" ]]; then
-  GOOGLE_AUTH_IDS="$WEB_ID,$IOS_ID"
+  GOOGLE_AUTH_IDS="${GOOGLE_AUTH_IDS},${IOS_ID}"
 else
   echo "WARN: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID not set — Google iOS native will fail until added"
+fi
+if [[ -n "$ANDROID_ID" ]]; then
+  GOOGLE_AUTH_IDS="${GOOGLE_AUTH_IDS},${ANDROID_ID}"
+else
+  echo "WARN: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID not set — Google Android native will fail until added"
 fi
 
 echo "Patching project $PROJECT_REF ..."
@@ -69,8 +75,8 @@ console.log(JSON.stringify({
   external_apple_client_id: process.env.APPLE_CLIENT_IDS,
   ...(appleSecret ? { external_apple_secret: appleSecret } : {}),
   external_google_enabled: true,
-  external_google_client_id: process.env.WEB_ID,
-  external_google_authorized_client_ids: process.env.GOOGLE_AUTH_IDS,
+  // Dashboard \"Authorized Client IDs\" — Web first, then iOS/Android (comma-separated).
+  external_google_client_id: process.env.GOOGLE_AUTH_IDS,
   external_google_skip_nonce_check: true,
   ...(googleSecret ? { external_google_secret: googleSecret } : {}),
 }));
@@ -87,6 +93,6 @@ let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
     if (j.message) { console.error('FAIL:', j.message); process.exit(1); }
     console.log('OK: Supabase native auth config updated');
     console.log('  Apple client_id:', j.external_apple_client_id);
-    console.log('  Google authorized:', j.external_google_authorized_client_ids || j.external_google_client_id);
+    console.log('  Google client_id (authorized):', j.external_google_client_id);
   } catch (e) { console.log(d); }
 })"

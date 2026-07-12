@@ -27,7 +27,17 @@ AF:C1:AF:B5:5D:CA:9E:C6:0E:81:A4:53:A2:AD:95:AD:CD:6A:85:4F:A9:FE:57:DB:6A:11:52
 3. Name: `Side Quest Android`
 4. Package: `au.enginelabs.sidequest`
 5. SHA-1: paste value above
-6. Create
+6. Create → copy the Client ID into `.env`:
+
+```
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=300778226594-508mlkmjir3flai0ppnotbj4niu81paf.apps.googleusercontent.com
+```
+
+7. Patch Supabase authorized client IDs:
+
+```bash
+bash scripts/patch-supabase-native-auth.sh
+```
 
 Regenerate fingerprints:
 

@@ -9,6 +9,7 @@ Configure Supabase Auth for Side Quest (Google, Apple, phone OTP). Live testing 
    - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
    - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (Google native — Web client)
    - `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` (Google native — iOS client; required for iOS builds)
+   - `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` (Google native — Android client; required for Android builds)
    - `EXPO_PUBLIC_APP_SCHEME=sidequest` (default)
 2. Phase 2 remote push complete (`handle_new_user` trigger live)
 3. **Development build required** — native Google/Apple SDKs do not work in Expo Go. Use `npx expo run:ios` / `run:android` or EAS.
@@ -49,7 +50,7 @@ npx expo run:ios --device "Free Malware"
 |------|---------|---------|
 | **Web application** | ID token for Supabase | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` + Supabase Google provider |
 | **iOS** | Native Google on iOS | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` + `app.config.ts` plugin (`iosUrlScheme`) |
-| **Android** | Native Google on Android | Package `au.enginelabs.sidequest` + SHA-1 from your keystore ([PHASE9_SETUP](./PHASE9_SETUP.md)) |
+| **Android** | Native Google on Android | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` + package `au.enginelabs.sidequest` + SHA-1 ([ANDROID_GOOGLE_AUTH](./ANDROID_GOOGLE_AUTH.md)) |
 
 **iOS client:** bundle ID `au.enginelabs.sidequest`
 
@@ -71,7 +72,7 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 | Enable | On |
 | Client ID | Same as `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (Web client) |
 | Client Secret | From Google Web client (Dashboard only — never in app) |
-| **Authorized Client IDs** | Web + iOS IDs comma-separated, e.g. `300778226594-….apps.googleusercontent.com,<ios-client-id>` |
+| **Authorized Client IDs** | Web + iOS + Android IDs comma-separated, e.g. `300778226594-….apps.googleusercontent.com,<ios-client-id>,<android-client-id>` |
 | **Skip nonce check** | **On** — required for native iOS Google Sign-In (SDK embeds a nonce in the ID token but does not expose the raw value to the app) |
 
 Quick setup: `npm run setup:google-native`

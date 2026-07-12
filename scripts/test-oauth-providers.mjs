@@ -50,6 +50,7 @@ const url = env.EXPO_PUBLIC_SUPABASE_URL;
 const anonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const googleWeb = env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim();
 const googleIos = env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
+const googleAndroid = env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim();
 const iosScheme = googleIosUrlScheme(googleIos);
 
 if (!url || !anonKey) {
@@ -75,6 +76,15 @@ if (!googleIos) {
   fail++;
 } else {
   console.log(`OK: Google iOS client ID set; iosUrlScheme=${iosScheme}`);
+}
+
+if (!googleAndroid) {
+  console.log('WARN: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID missing — required for Android Google Sign-In builds');
+} else if (!googleAndroid.endsWith('.apps.googleusercontent.com')) {
+  console.log('FAIL: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID format invalid');
+  fail++;
+} else {
+  console.log(`OK: Google Android client ID set (${googleAndroid.slice(0, 12)}…)`);
 }
 
 const supabase = createClient(url, anonKey);

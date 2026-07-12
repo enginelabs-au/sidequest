@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 const extra = Constants.expoConfig?.extra ?? {};
 const googleWebClientId = (extra.googleWebClientId as string | undefined)?.trim();
 const googleIosClientId = (extra.googleIosClientId as string | undefined)?.trim();
+const googleAndroidClientId = (extra.googleAndroidClientId as string | undefined)?.trim();
 
 let googleConfigured = false;
 
@@ -36,6 +37,10 @@ export function isGoogleIosClientConfigured(): boolean {
   return !!googleIosClientId;
 }
 
+export function isGoogleAndroidClientConfigured(): boolean {
+  return !!googleAndroidClientId;
+}
+
 /** Human-readable prerequisite errors before opening native sign-in UI. */
 export function getGoogleSignInPrerequisiteError(): string | null {
   if (!googleWebClientId) {
@@ -43,6 +48,9 @@ export function getGoogleSignInPrerequisiteError(): string | null {
   }
   if (Platform.OS === 'ios' && !googleIosClientId) {
     return 'Add EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID to .env, then run: npx expo prebuild --clean --platform ios && npx expo run:ios';
+  }
+  if (Platform.OS === 'android' && !googleAndroidClientId) {
+    return 'Add EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID to .env and register the Android OAuth client in Google Cloud (package + SHA-1).';
   }
   return null;
 }
@@ -191,7 +199,7 @@ function mapNativeAuthError(
   }
   if (provider === 'google' && (msg.includes('audience') || msg.includes('client id') || msg.includes('authorized'))) {
     return new Error(
-      'Google sign-in rejected by Supabase. In Dashboard → Auth → Google, add your iOS OAuth client ID under Authorized Client IDs (comma-separated with the Web client).',
+      'Google sign-in rejected by Supabase. In Dashboard → Auth → Google, add Web + iOS + Android OAuth client IDs under Authorized Client IDs (comma-separated).',
     );
   }
   return new Error(error.message ?? 'Sign in failed');
