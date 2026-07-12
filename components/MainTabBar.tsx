@@ -1,10 +1,10 @@
 import { AppIcon, type AppIconName } from '@/components/AppIcon';
 import { TAB_BAR_BODY_HEIGHT } from '@/constants/tabBar';
-import { radius, spacing } from '@/constants/theme';
+import { spacing } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs';
 import { useMemo } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type TabKey = 'home' | 'activity' | 'map' | 'checkins' | 'profile';
@@ -31,40 +31,14 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const tabBarColor = colors.tabBar;
-  const activeRouteName = state.routes[state.index]?.name;
-  const isMapTab = activeRouteName === 'map';
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        outer: {
-          backgroundColor: isMapTab ? 'transparent' : colors.background,
-        },
-        wrap: {
+        root: {
           backgroundColor: tabBarColor,
-          borderTopLeftRadius: radius.xl,
-          borderTopRightRadius: radius.xl,
           paddingTop: spacing.md,
-          overflow: 'visible',
-          ...Platform.select({
-            ios: { borderCurve: 'continuous' as const },
-            default: {},
-          }),
-        },
-        bevelEdge: {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 1,
-          backgroundColor: colors.accentDark,
-          opacity: 0.22,
-          borderTopLeftRadius: radius.xl,
-          borderTopRightRadius: radius.xl,
-          ...Platform.select({
-            ios: { borderCurve: 'continuous' as const },
-            default: {},
-          }),
+          width: '100%',
         },
         bar: {
           flexDirection: 'row',
@@ -121,16 +95,14 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
           color: colors.onPurple,
         },
       }),
-    [tabBarColor, colors, isMapTab],
+    [tabBarColor, colors],
   );
 
   const bottomPad = Math.max(insets.bottom, spacing.sm);
 
   return (
-    <View style={[styles.outer, { paddingBottom: bottomPad, minHeight: TAB_BAR_BODY_HEIGHT + bottomPad }]}>
-      <View style={[styles.wrap, { paddingBottom: 0 }]}>
-        <View style={styles.bevelEdge} pointerEvents="none" />
-        <View style={styles.bar}>
+    <View style={[styles.root, { paddingBottom: bottomPad, minHeight: TAB_BAR_BODY_HEIGHT + bottomPad }]}>
+      <View style={styles.bar}>
         {TAB_ORDER.map((tabKey) => {
           const routeIndex = state.routes.findIndex((r) => r.name === tabKey);
           if (routeIndex < 0) return null;
@@ -197,7 +169,6 @@ export function MainTabBar({ state, navigation }: BottomTabBarProps) {
             </Pressable>
           );
         })}
-        </View>
       </View>
     </View>
   );

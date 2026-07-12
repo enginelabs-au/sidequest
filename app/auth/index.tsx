@@ -2,11 +2,18 @@ import { Button, Card, ErrorBanner, Screen } from '@/components/ui';
 import { hasLegalUrls, privacyPolicyUrl, termsUrl } from '@/constants/legal';
 import { colors, spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
-import { ensureProfile, signInWithOAuth } from '@/lib/auth';
+import {
+    configureNativeAuth,
+    ensureProfile,
+    getGoogleSignInPrerequisiteError,
+    signInWithAppleNative,
+    signInWithGoogleNative,
+} from '@/lib/auth';
 import { formatUserError } from '@/lib/errors';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function AuthScreen() {
@@ -15,7 +22,16 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const googlePrereq = getGoogleSignInPrerequisiteError();
   const authDisabled = !isSupabaseConfigured || !!loading;
+
+  useEffect(() => {
+    configureNativeAuth();
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
+    }
+  }, []);
 
   const openUrl = async (url: string | null, label: string) => {
     if (!url) return;
@@ -26,21 +42,38 @@ export default function AuthScreen() {
     }
   };
 
-  const handleOAuth = async (provider: 'google' | 'apple') => {
+  const finishSignIn = async (session: Awaited<ReturnType<typeof signInWithGoogleNative>>) => {
+    if (session) {
+      await ensureProfile();
+      await refreshCheckIn();
+      router.replace('/');
+    } else {
+      setNotice('Sign in cancelled.');
+    }
+  };
+
+  const handleGoogle = async () => {
     setError(null);
     setNotice(null);
-    setLoading(provider);
+    setLoading('google');
     try {
-      const session = await signInWithOAuth(provider);
-      if (session) {
-        await ensureProfile();
-        await refreshCheckIn();
-        router.replace('/');
-      } else {
-        setNotice('Sign in cancelled.');
-      }
+      await finishSignIn(await signInWithGoogleNative());
     } catch (e) {
-      setError(formatUserError(e, 'Sign in failed'));
+      setError(formatUserError(e, 'Google sign in failed'));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleApple = async () => {
+    if (authDisabled || loading) return;
+    setError(null);
+    setNotice(null);
+    setLoading('apple');
+    try {
+      await finishSignIn(await signInWithAppleNative());
+    } catch (e) {
+      setError(formatUserError(e, 'Apple sign in failed'));
     } finally {
       setLoading(null);
     }
@@ -60,25 +93,27 @@ export default function AuthScreen() {
       {!isSupabaseConfigured ? (
         <ErrorBanner message="Add Supabase keys to .env — see .env.example and docs/PHASE3_AUTH.md." />
       ) : null}
+      {googlePrereq ? <ErrorBanner message={googlePrereq} /> : null}
       {error ? <ErrorBanner message={error} /> : null}
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
       <Card>
         <Button
           title={loading === 'google' ? 'Signing in...' : 'Continue with Google'}
-          onPress={() => handleOAuth('google')}
-          disabled={authDisabled}
+          onPress={handleGoogle}
+          disabled={authDisabled || !!googlePrereq}
           accessibilityLabel="Continue with Google"
         />
-        {Platform.OS === 'ios' ? (
-          <Button
-            title={loading === 'apple' ? 'Signing in...' : 'Continue with Apple'}
-            variant="secondary"
-            onPress={() => handleOAuth('apple')}
-            disabled={authDisabled}
-            accessibilityLabel="Continue with Apple"
-            style={styles.gap}
-          />
+        {Platform.OS === 'ios' && appleAvailable ? (
+          <View pointerEvents={authDisabled || loading === 'apple' ? 'none' : 'auto'}>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={12}
+              style={[styles.appleBtn, loading === 'apple' && styles.appleBtnDisabled]}
+              onPress={handleApple}
+            />
+          </View>
         ) : null}
         <Button
           title="Continue with phone"
@@ -144,6 +179,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   gap: { marginTop: spacing.md },
+  appleBtn: {
+    width: '100%',
+    height: 48,
+    marginTop: spacing.md,
+  },
+  appleBtnDisabled: { opacity: 0.6 },
   notice: {
     color: colors.textMuted,
     textAlign: 'center',

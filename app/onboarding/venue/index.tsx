@@ -18,6 +18,7 @@ import { formatUserError } from '@/lib/errors';
 import type { Coordinates } from '@/lib/geo';
 import { fetchPlaceLocation } from '@/lib/googlePlaces';
 import { googleActivityColor, type GoogleActivityLevel } from '@/lib/googleVenueSignals';
+import { routes } from '@/lib/routes';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { venueDetailRoute } from '@/lib/venueNavigation';
 import { countVenuePresence } from '@/lib/venuePresence';
@@ -30,7 +31,6 @@ import {
     sortVenuesForRadar,
 } from '@/lib/venueRadar';
 import { loadVenuePickerData } from '@/lib/venues';
-import { routes } from '@/lib/routes';
 import type { IntentMode, Venue } from '@/types/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePathname, useRouter } from 'expo-router';
@@ -313,7 +313,7 @@ export default function VenueScreen() {
   );
 
   const radarBody = (
-    <View style={styles.root}>
+    <View style={[styles.root, isMainMapTab && styles.rootMapTab]}>
       <SocialRadarMap
         ref={mapRef}
         initialCenter={initialMapCenter}

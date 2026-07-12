@@ -128,3 +128,14 @@ export async function unmarkUserWaved(userId: string): Promise<void> {
 export function formatTimeLabelNow(): string {
   return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
+
+/** Wipe guest-era local inbox/activity/wave state after a real sign-in. */
+export async function clearLocalSocialData(): Promise<void> {
+  await AsyncStorage.multiRemove([
+    LOCAL_INBOX_KEY,
+    LOCAL_ACTIVITY_KEY,
+    DELETED_INBOX_PEER_IDS_KEY,
+    DELETED_ACTIVITY_IDS_KEY,
+    WAVED_USER_IDS_KEY,
+  ]);
+}

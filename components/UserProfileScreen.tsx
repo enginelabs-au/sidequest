@@ -1,5 +1,6 @@
 import { AppHeader } from '@/components/AppHeader';
 import { BlockedUsersModal } from '@/components/BlockedUsersModal';
+import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { SettingsMenuRow } from '@/components/SettingsMenuRow';
 import {
     Button,
@@ -7,7 +8,6 @@ import {
     ErrorBanner,
     FieldLabel,
     LoadingState,
-    Screen,
     SegmentedControl,
     TagRow,
     ToggleRow,
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui';
 import { hasLegalUrls, privacyPolicyUrl, termsUrl } from '@/constants/legal';
 import { INVISIBLE_PREF_KEY, SELECTED_MODE_KEY } from '@/constants/storage';
-import { CHECK_IN_DURATION_HOURS, radius, shadows, spacing, VENUE_MAX_DISTANCE_KM } from '@/constants/theme';
+import { CHECK_IN_DURATION_HOURS, radius, spacing, VENUE_MAX_DISTANCE_KM } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScreenBackgroundStyle, useTheme } from '@/contexts/ThemeContext';
 import { useTabBarInset } from '@/hooks/useTabBarInset';
@@ -27,14 +27,16 @@ import {
     type CheckInFormFields,
 } from '@/lib/checkin';
 import { performCheckout } from '@/lib/checkout';
+import { deleteOwnAccount } from '@/lib/deleteAccount';
 import { formatUserError } from '@/lib/errors';
 import { getSameModeOnlyPreference, setSameModeOnlyPreference } from '@/lib/preferences';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fetchVenueById } from '@/lib/venues';
 import type { IntentMode } from '@/types/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MODES: IntentMode[] = ['friends', 'networking', 'dating'];
@@ -90,6 +92,7 @@ type Props = {
 };
 
 export function UserProfileScreen({ onBack, isTabRoot }: Props) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const tabBarInset = useTabBarInset();
   const screenStyle = useScreenBackgroundStyle();
@@ -105,6 +108,8 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [blockedOpen, setBlockedOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const canSave = !!user && isSupabaseConfigured && !devBypassActive;
 
@@ -232,14 +237,15 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
     () =>
       StyleSheet.create({
         root: { flex: 1, backgroundColor: colors.background },
-        heroWrap: {
-          alignItems: 'center',
-          marginBottom: spacing.lg,
-          marginTop: spacing.sm,
+        scroll: {
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.lg,
+          gap: spacing.md,
         },
-        avatarOuter: {
-          zIndex: 2,
-          marginBottom: -36,
+        heroCard: {
+          alignItems: 'center',
+          paddingVertical: spacing.lg,
+          gap: spacing.sm,
         },
         avatar: {
           width: 88,
@@ -248,9 +254,7 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
           backgroundColor: colors.purpleMuted,
           alignItems: 'center',
           justifyContent: 'center',
-          borderWidth: 4,
-          borderColor: colors.card,
-          ...shadows.card,
+          marginBottom: spacing.xs,
         },
         avatarText: {
           color: colors.text,
@@ -259,8 +263,8 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
         },
         statusDot: {
           position: 'absolute',
-          right: 4,
-          bottom: 4,
+          right: 2,
+          bottom: 2,
           width: 16,
           height: 16,
           borderRadius: 8,
@@ -271,18 +275,14 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
         statusDotActive: {
           backgroundColor: colors.coral,
         },
-        heroCard: {
-          width: '100%',
-          alignItems: 'center',
-          paddingTop: spacing.xxl + spacing.sm,
-          paddingBottom: spacing.lg,
-          marginBottom: 0,
+        avatarWrap: {
+          position: 'relative',
         },
         heroName: {
           color: colors.text,
           fontSize: 20,
           fontWeight: '800',
-          marginBottom: spacing.xs,
+          textAlign: 'center',
         },
         heroTagline: {
           color: colors.textMuted,
@@ -291,7 +291,6 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
           lineHeight: 20,
         },
         menuCard: {
-          marginBottom: spacing.lg,
           paddingTop: spacing.xs,
           paddingBottom: spacing.xs,
         },
@@ -314,8 +313,7 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
         },
         statusFooter: {
           alignItems: 'center',
-          marginTop: spacing.md,
-          marginBottom: spacing.xl,
+          marginTop: spacing.sm,
           gap: 4,
         },
         statusLine: {
@@ -361,11 +359,45 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete account',
-      'Account deletion is handled by support. Email privacy@enginelabs.au to request removal of your data.',
-      [{ text: 'OK' }],
-    );
+    if (devBypassActive) {
+      setDeleteOpen(true);
+      return;
+    }
+    if (!isSupabaseConfigured || !user) {
+      setError('Sign in with a real account to use in-app deletion.');
+      return;
+    }
+    setDeleteOpen(true);
+  };
+
+  const performAccountDeletion = async () => {
+    setDeletingAccount(true);
+    setError(null);
+    try {
+      if (checkIn) {
+        try {
+          const venue = await fetchVenueById(checkIn.venue_id);
+          await performCheckout(refreshCheckIn, {
+            venueId: checkIn.venue_id,
+            venueName: venue?.name ?? 'Venue',
+            mode: checkIn.mode,
+          });
+        } catch (e) {
+          console.warn('checkout before delete failed:', e);
+        }
+      }
+      await deleteOwnAccount({ devBypassOnly: devBypassActive });
+      setDeleteOpen(false);
+      if (devBypassActive) {
+        await signOut();
+      } else {
+        router.replace('/auth');
+      }
+    } catch (e) {
+      setError(formatUserError(e, 'Could not delete account'));
+    } finally {
+      setDeletingAccount(false);
+    }
   };
 
   if (loading) {
@@ -375,33 +407,35 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
   const headerTitle = section === 'hub' ? 'Settings' : SECTION_TITLES[section];
 
   return (
-    <View
-      style={[
-        styles.root,
-        screenStyle,
-        { paddingBottom: (isTabRoot ? tabBarInset : insets.bottom) + spacing.md },
-      ]}
-    >
-      <Screen scroll safeTop>
+    <View style={[styles.root, screenStyle, { paddingTop: insets.top }]}>
+      <View style={{ paddingHorizontal: spacing.lg }}>
         <AppHeader
           title={headerTitle}
           onBack={isTabRoot && section === 'hub' ? undefined : handleBack}
         />
+      </View>
 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: (isTabRoot ? tabBarInset : insets.bottom) + spacing.md },
+        ]}
+      >
         {section === 'hub' ? (
           <>
-            <View style={styles.heroWrap}>
-              <View style={styles.avatarOuter}>
+            <Card style={styles.heroCard} padded>
+              <View style={styles.avatarWrap}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initials(fields.displayName || 'Guest')}</Text>
                 </View>
                 <View style={[styles.statusDot, visible && styles.statusDotActive]} />
               </View>
-              <Card style={styles.heroCard} padded>
-                <Text style={styles.heroName}>{fields.displayName || 'Guest'}</Text>
-                <Text style={styles.heroTagline}>{tagline}</Text>
-              </Card>
-            </View>
+              <Text style={styles.heroName}>{fields.displayName || 'Guest'}</Text>
+              <Text style={styles.heroTagline}>{tagline}</Text>
+            </Card>
 
             <Card style={styles.menuCard} padded>
               <SettingsMenuRow
@@ -668,9 +702,15 @@ export function UserProfileScreen({ onBack, isTabRoot }: Props) {
             )}
           </Card>
         ) : null}
-      </Screen>
+      </ScrollView>
 
       <BlockedUsersModal visible={blockedOpen} onClose={() => setBlockedOpen(false)} />
+      <DeleteAccountModal
+        visible={deleteOpen}
+        deleting={deletingAccount}
+        onClose={() => setDeleteOpen(false)}
+        onConfirmDelete={performAccountDeletion}
+      />
     </View>
   );
 }

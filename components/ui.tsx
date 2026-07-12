@@ -1,6 +1,6 @@
 import { radius, shadows, spacing, typography, type AppColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useMemo } from 'react';
+import { forwardRef, useMemo } from 'react';
 import {
     ActivityIndicator,
     Pressable,
@@ -429,17 +429,21 @@ export function TagRow({ tags }: { tags: string[] }) {
   );
 }
 
-export function AppTextInput({ style, ...props }: TextInputProps) {
+export const AppTextInput = forwardRef<TextInput, TextInputProps>(function AppTextInput(
+  { style, ...props },
+  ref,
+) {
   const { colors } = useTheme();
   const styles = useUiStyles();
   return (
     <TextInput
+      ref={ref}
       placeholderTextColor={colors.textMuted}
       style={[styles.input, style]}
       {...props}
     />
   );
-}
+});
 
 export function ToggleRow({
   label,

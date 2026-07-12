@@ -15,6 +15,7 @@ export type CheckoutMeta = {
 export async function performCheckout(
   refreshCheckIn: () => Promise<void>,
   meta?: CheckoutMeta,
+  onSuccess?: () => void,
 ): Promise<void> {
   if (meta) {
     await recordPastCheckIn({
@@ -32,4 +33,5 @@ export async function performCheckout(
     await checkoutUser();
   }
   await refreshCheckIn();
+  onSuccess?.();
 }

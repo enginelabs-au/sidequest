@@ -1,5 +1,6 @@
+import { DEV_IVY_PEER_IDS } from '@/lib/devFakePeer';
+import { inboxPreviewIsIncomingWave, messageIsOutgoingWave } from '@/lib/waveChat';
 import type { Connection, Message } from '@/types/database';
-import { DEV_FAKE_PEER_ID, DEV_IVY_PEER_IDS } from '@/lib/devFakePeer';
 
 const stores = new Map<string, Message[]>();
 
@@ -59,10 +60,63 @@ const INBOUND_SEEDS: Record<string, Message[]> = {
       created_at: minutesAgo(60),
     },
   ],
+  'mock-liam': [
+    {
+      id: 'seed-liam-wave',
+      connection_id: 'pending-mock-liam',
+      sender_id: 'mock-liam',
+      body: '👋 Liam Chen waved at you at The Ivy',
+      created_at: minutesAgo(14),
+    },
+  ],
 };
 
 function seedForPeer(peerId: string): Message[] {
   return INBOUND_SEEDS[peerId] ? [...INBOUND_SEEDS[peerId]] : [];
+}
+
+function peerAlreadySentWave(messages: Message[], peerId: string): boolean {
+  return messages.some(
+    (m) => m.sender_id === peerId && /\bwaved\b/i.test(m.body),
+  );
+}
+
+/** Insert an inbound wave chat bubble when alerts/inbox say they waved but chat is empty. */
+export function ensureInboundPeerWave(
+  peerId: string,
+  peerDisplayName: string,
+  opts?: {
+    inboxPreview?: string;
+    hasWaveActivity?: boolean;
+    venueName?: string;
+  },
+): void {
+  const prev = stores.has(peerId) ? [...(stores.get(peerId) ?? [])] : seedForPeer(peerId);
+  if (peerAlreadySentWave(prev, peerId)) {
+    stores.set(peerId, prev);
+    return;
+  }
+
+  const previewWave = inboxPreviewIsIncomingWave(opts?.inboxPreview);
+  if (!previewWave && !opts?.hasWaveActivity) {
+    stores.set(peerId, prev);
+    return;
+  }
+
+  const body =
+    previewWave && opts?.inboxPreview
+      ? `👋 ${opts.inboxPreview}`
+      : `👋 ${peerDisplayName} waved at you${opts?.venueName ? ` at ${opts.venueName}` : ''}`;
+
+  const msg: Message = {
+    id: `pending-inbound-wave-${peerId}`,
+    connection_id: `pending-${peerId}`,
+    sender_id: peerId,
+    body,
+    created_at: minutesAgo(1),
+  };
+
+  stores.set(peerId, [msg, ...prev]);
 }
 
 export function loadPendingPeerChat(
@@ -97,9 +151,52 @@ export function sendPendingPeerMessage(userId: string, peerId: string, body: str
     body: body.trim(),
     created_at: new Date().toISOString(),
   };
-  const prev = stores.get(peerId) ?? [];
+  const prev = stores.get(peerId) ?? seedForPeer(peerId);
   stores.set(peerId, [...prev, msg]);
   return msg;
+}
+
+/** Record an outgoing wave in a pending peer chat thread. */
+export function appendPendingPeerWave(
+  userId: string,
+  peerId: string,
+  peerDisplayName: string,
+): Message {
+  const msg: Message = {
+    id: `pending-wave-${Date.now()}`,
+    connection_id: `pending-${peerId}`,
+    sender_id: userId,
+    body: `👋 You waved at ${peerDisplayName}`,
+    created_at: new Date().toISOString(),
+  };
+  const prev = stores.get(peerId) ?? seedForPeer(peerId);
+  stores.set(peerId, [...prev, msg]);
+  return msg;
+}
+
+export function removePendingOutgoingWave(userId: string, peerId: string): boolean {
+  const prev = stores.get(peerId);
+  if (!prev) return false;
+  const wave = prev.find((m) => messageIsOutgoingWave(m, userId));
+  if (!wave) return false;
+  stores.set(
+    peerId,
+    prev.filter((m) => m.id !== wave.id),
+  );
+  return true;
+}
+
+export function editPendingPeerMessage(peerId: string, messageId: string, body: string): Message | null {
+  const prev = stores.get(peerId);
+  if (!prev) return null;
+  const idx = prev.findIndex((m) => m.id === messageId);
+  if (idx < 0) return null;
+  if (messageIsOutgoingWave(prev[idx], prev[idx].sender_id)) return null;
+  const updated: Message = { ...prev[idx], body: body.trim() };
+  const next = [...prev];
+  next[idx] = updated;
+  stores.set(peerId, next);
+  return updated;
 }
 
 export function resetPendingPeerChats(): void {

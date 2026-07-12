@@ -1,5 +1,5 @@
 import { colors, radius, spacing } from '@/constants/theme';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type Props = {
   label: string;
@@ -15,10 +15,12 @@ export function NotifyTimerBar({ label, countdown, onStop, onSendNow }: Props) {
       accessibilityRole="summary"
       accessibilityLabel={`${label} ${countdown}`}
     >
-      <Text style={styles.label} numberOfLines={1}>
-        {label}
-      </Text>
-      <Text style={styles.countdown}>{countdown}</Text>
+      <View style={styles.topRow}>
+        <Text style={styles.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          {label}
+        </Text>
+        <Text style={styles.countdown}>{countdown}</Text>
+      </View>
       <View style={styles.actions}>
         <Pressable
           onPress={onSendNow}
@@ -41,60 +43,51 @@ export function NotifyTimerBar({ label, countdown, onStop, onSendNow }: Props) {
   );
 }
 
-const raised = Platform.select({
-  ios: {
-    shadowColor: '#744210',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-  },
-  android: { elevation: 6 },
-  default: {},
-});
-
 const styles = StyleSheet.create({
   bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    minHeight: 52,
+    alignSelf: 'stretch',
+    width: '100%',
+    gap: spacing.xs,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.full,
     backgroundColor: colors.wavePending,
-    borderBottomWidth: 4,
-    borderBottomColor: colors.wavePendingShadow,
-    ...raised,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    width: '100%',
   },
   label: {
     color: colors.onPurple,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '800',
     flex: 1,
   },
   countdown: {
     color: colors.onPurple,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '900',
     fontVariant: ['tabular-nums'],
-    minWidth: 48,
-    textAlign: 'center',
+    minWidth: 36,
+    textAlign: 'right',
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'center',
+    gap: spacing.md,
   },
   actionPrimary: {
     color: colors.onPurple,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '900',
     textDecorationLine: 'underline',
   },
   actionStop: {
     color: colors.onPurple,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '800',
     textDecorationLine: 'underline',
   },

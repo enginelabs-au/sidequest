@@ -1,4 +1,5 @@
 import { DEV_FAKE_PEER_ID } from '@/lib/devFakePeer';
+import { messageIsOutgoingWave } from '@/lib/waveChat';
 import type { Connection, Message } from '@/types/database';
 
 export const DEV_JORDAN_CONNECTION_ID = 'dev-local-jordan';
@@ -63,6 +64,35 @@ export function sendDevJordanMessage(userId: string, body: string): Message {
   };
   localMessages = [...localMessages, msg];
   return msg;
+}
+
+/** Record an outgoing wave in the Jordan dev chat thread. */
+export function appendDevJordanWave(userId: string, peerDisplayName: string): Message {
+  const msg: Message = {
+    id: `dev-jordan-wave-${Date.now()}`,
+    connection_id: DEV_JORDAN_CONNECTION_ID,
+    sender_id: userId,
+    body: `👋 You waved at ${peerDisplayName}`,
+    created_at: new Date().toISOString(),
+  };
+  localMessages = [...localMessages, msg];
+  return msg;
+}
+
+export function removeDevJordanOutgoingWave(userId: string): boolean {
+  const wave = localMessages.find((m) => messageIsOutgoingWave(m, userId));
+  if (!wave) return false;
+  localMessages = localMessages.filter((m) => m.id !== wave.id);
+  return true;
+}
+
+export function editDevJordanMessage(messageId: string, body: string): Message | null {
+  const idx = localMessages.findIndex((m) => m.id === messageId);
+  if (idx < 0) return null;
+  if (messageIsOutgoingWave(localMessages[idx], localMessages[idx].sender_id)) return null;
+  const updated: Message = { ...localMessages[idx], body: body.trim() };
+  localMessages = localMessages.map((m) => (m.id === messageId ? updated : m));
+  return updated;
 }
 
 export function resetDevJordanChat(): void {

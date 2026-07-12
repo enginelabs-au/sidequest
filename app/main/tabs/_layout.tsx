@@ -12,6 +12,7 @@ export default function MainTabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.onPurple,
         tabBarInactiveTintColor: colors.tabBarInactive,
+        sceneStyle: { backgroundColor: colors.background },
         tabBarStyle: {
           position: 'absolute',
           left: 0,
@@ -26,7 +27,13 @@ export default function MainTabsLayout() {
     >
       <Tabs.Screen name="home" options={{ title: 'Home' }} />
       <Tabs.Screen name="activity" options={{ title: 'Alerts' }} />
-      <Tabs.Screen name="map" options={{ title: 'Map' }} />
+      <Tabs.Screen
+        name="map"
+        options={{
+          title: 'Map',
+          sceneStyle: { backgroundColor: 'transparent' },
+        }}
+      />
       <Tabs.Screen name="checkins" options={{ title: 'Check-ins' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       <Tabs.Screen name="inbox" options={{ href: null, title: 'Inbox' }} />

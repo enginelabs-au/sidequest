@@ -1,8 +1,20 @@
+import { isDevIvyPeerId } from '@/lib/devFakePeer';
+import { isGuestSimulationActive } from '@/lib/guestSimulation';
 import {
     loadDeletedActivityIds,
     loadLocalActivityItems,
 } from '@/lib/socialLocal';
 import { MOCK_ACTIVITY_ITEMS, type ActivityItem } from '@/lib/socialMock';
+
+function isStubPeerId(peerUserId: string | undefined): boolean {
+  if (!peerUserId) return false;
+  return peerUserId.startsWith('mock-') || isDevIvyPeerId(peerUserId);
+}
+
+function withoutStubActivity(items: ActivityItem[]): ActivityItem[] {
+  if (isGuestSimulationActive()) return items;
+  return items.filter((i) => !isStubPeerId(i.peerUserId));
+}
 
 function mergeActivity(local: ActivityItem[], mock: ActivityItem[]): ActivityItem[] {
   const seen = new Set<string>();
@@ -22,5 +34,6 @@ export async function loadMergedActivityItems(): Promise<ActivityItem[]> {
     loadDeletedActivityIds(),
   ]);
   const deleted = new Set(deletedIds);
-  return mergeActivity(local, MOCK_ACTIVITY_ITEMS).filter((i) => !deleted.has(i.id));
+  const stub = isGuestSimulationActive() ? MOCK_ACTIVITY_ITEMS : [];
+  return withoutStubActivity(mergeActivity(local, stub)).filter((i) => !deleted.has(i.id));
 }

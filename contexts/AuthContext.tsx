@@ -7,7 +7,11 @@ import {
     isDevBypassActive,
     type DevBypassState,
 } from '@/lib/devAuthBypass';
+import { resetDevJordanChat } from '@/lib/devJordanChat';
 import { clearDevLocalCheckIn, loadDevLocalCheckIn } from '@/lib/devLocalCheckIn';
+import { resetPendingPeerChats } from '@/lib/devPendingChat';
+import { setGuestSimulationActive } from '@/lib/guestSimulation';
+import { clearLocalSocialData } from '@/lib/socialLocal';
 import { supabase } from '@/lib/supabase';
 import type { CheckIn } from '@/types/database';
 import type { Session, User } from '@supabase/supabase-js';
@@ -50,6 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const userId = session?.user?.id ?? devBypass?.mockUser?.id;
   const devBypassActive = isDevBypassActive(devBypass);
+
+  useEffect(() => {
+    setGuestSimulationActive(devBypassActive && !session);
+  }, [devBypassActive, session]);
 
   const refreshCheckIn = useCallback(async () => {
     if (!userId) {
@@ -158,6 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDevBypass(null);
         if (event === 'SIGNED_IN') {
           try {
+            await clearLocalSocialData();
+            resetPendingPeerChats();
+            resetDevJordanChat();
             await ensureProfile();
           } catch (e) {
             console.warn('ensureProfile failed:', e);

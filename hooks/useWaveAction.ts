@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useCheckInGate } from '@/hooks/useCheckInGate';
 import { formatUserError } from '@/lib/errors';
-import { sendWave, unwaveUser } from '@/lib/waves';
+import { canUnwavePeer, sendWave, unwaveUser } from '@/lib/waves';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
@@ -67,9 +67,17 @@ export function useWaveAction() {
   const unwaveAt = useCallback(
     async (target: WaveTarget) => {
       if (!user) return;
+      const allowed = await canUnwavePeer(user.id, target.user_id);
+      if (!allowed) {
+        Alert.alert(
+          'Cannot un-wave',
+          'They have already seen your wave.',
+        );
+        return;
+      }
       setLoading(true);
       try {
-        await unwaveUser(target.user_id);
+        await unwaveUser(target.user_id, user.id);
         markUnwavedLocal(target.user_id);
       } catch (e) {
         Alert.alert('Could not un-wave', formatUserError(e, 'Try again in a moment.'));

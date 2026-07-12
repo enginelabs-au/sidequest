@@ -17,18 +17,22 @@ import { useNotifyTimer } from '@/hooks/useNotifyTimer';
 import {
     appendMessageDeduped,
     ChatAccessError,
+    editChatMessage,
     loadChat,
     MessageBlockedError,
     sendChatMessage,
 } from '@/lib/chat';
-import { chatNotifyTimerId } from '@/lib/notifyTimerService';
+import { hydratePendingInboundWave, loadChatWaveContext } from '@/lib/chatWaveContext';
 import { performCheckout } from '@/lib/checkout';
+import { DEV_FAKE_PEER_ID } from '@/lib/devFakePeer';
 import {
+    editDevJordanMessage,
     isDevJordanConnection,
     loadDevJordanChat,
     sendDevJordanMessage,
 } from '@/lib/devJordanChat';
 import {
+    editPendingPeerMessage,
     loadPendingPeerChat,
     sendPendingPeerMessage,
 } from '@/lib/devPendingChat';
@@ -38,13 +42,25 @@ import {
     peerIdFromPendingConnection,
 } from '@/lib/inboxNavigation';
 import { mapTabRoute } from '@/lib/mapNavigation';
+import {
+    attachReadStatus,
+    autoReadMessageIds,
+    canEditOwnMessage,
+    loadConnectionReadMap,
+    markMessagesRead,
+    type ChatMessage,
+} from '@/lib/messageReadStatus';
+import { chatNotifyTimerId } from '@/lib/notifyTimerService';
 import { getPublicPeerProfile } from '@/lib/publicProfile';
 import { submitSafetyReport, type ReportReasonId } from '@/lib/safety';
+import type { ActivityItem } from '@/lib/socialMock';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { fetchVenueName } from '@/lib/venues';
+import { canUnwaveOutgoingWave, CHAT_SEEN_LABEL, messageIsOutgoingWave, shouldShowWaveBack } from '@/lib/waveChat';
+import { sendWave, unwaveUser } from '@/lib/waves';
 import type { Connection, Message } from '@/types/database';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     FlatList,
@@ -56,6 +72,8 @@ import {
     TextInput,
     View,
 } from 'react-native';
+
+const MESSAGE_READ_SIM_DELAY_MS = 8000;
 
 export default function ChatScreen() {
   const { connectionId: connectionIdParam, draft: draftParam } = useLocalSearchParams<{
@@ -75,6 +93,16 @@ export default function ChatScreen() {
   const [error, setError] = useState<string | null>(null);
   const [reportVisible, setReportVisible] = useState(false);
   const [venueName, setVenueName] = useState('Ephemeral Chat Room');
+  const [inboxPreview, setInboxPreview] = useState<string | undefined>();
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
+  const [hasWavedPeer, setHasWavedPeer] = useState(false);
+  const [wavingBack, setWavingBack] = useState(false);
+  const [unwaving, setUnwaving] = useState(false);
+  const [readMap, setReadMap] = useState<Record<string, string>>({});
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const readTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const notifyTimer = useNotifyTimer(
     connectionId ? chatNotifyTimerId(connectionId) : 'chat:unknown',
   );
@@ -92,13 +120,10 @@ export default function ChatScreen() {
         list: { flex: 1 },
         listContent: { paddingBottom: spacing.sm },
         bubble: {
-          maxWidth: '82%',
           borderRadius: radius.lg,
           padding: spacing.md,
-          marginBottom: spacing.sm,
         },
         mine: {
-          alignSelf: 'flex-end',
           backgroundColor: colors.bubbleOutgoing,
         },
         theirs: {
@@ -136,6 +161,66 @@ export default function ChatScreen() {
         },
         sendDisabled: { opacity: 0.45 },
         sendIcon: { color: colors.accentOnButton, fontSize: 20, fontWeight: '700' },
+        waveBack: {
+          marginTop: spacing.sm,
+          backgroundColor: colors.waveReady,
+        },
+        unWave: {
+          marginTop: spacing.sm,
+          backgroundColor: colors.waveCancel,
+        },
+        mineWrap: {
+          alignSelf: 'flex-end',
+          maxWidth: '82%',
+          marginBottom: spacing.sm,
+        },
+        bubblePressable: {
+          borderRadius: radius.lg,
+        },
+        bubbleEditable: {
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderStyle: 'dashed',
+        },
+        readLabel: {
+          color: colors.textMuted,
+          fontSize: 11,
+          fontWeight: '600',
+          textAlign: 'right',
+          marginTop: 2,
+          marginRight: spacing.xs,
+        },
+        bubbleWaveSelectable: {
+          borderWidth: 1,
+          borderColor: colors.waveCancel,
+        },
+        editPanel: {
+          marginTop: spacing.sm,
+          gap: spacing.sm,
+          padding: spacing.sm,
+          borderRadius: radius.md,
+          backgroundColor: colors.borderLight,
+        },
+        editInput: {
+          backgroundColor: colors.card,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: radius.md,
+          color: colors.text,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          fontSize: 15,
+          minHeight: 44,
+        },
+        editActions: {
+          flexDirection: 'row',
+          gap: spacing.sm,
+        },
+        editHint: {
+          color: colors.textMuted,
+          fontSize: 12,
+          marginBottom: spacing.xs,
+        },
       }),
     [colors],
   );
@@ -162,6 +247,10 @@ export default function ChatScreen() {
     if (isDevJordanConnection(connectionId)) {
       setLoading(true);
       setError(null);
+      const waveCtx = await loadChatWaveContext(user.id, DEV_FAKE_PEER_ID);
+      setInboxPreview(waveCtx.inboxPreview);
+      setActivityItems(waveCtx.activity);
+      setHasWavedPeer(waveCtx.hasWavedPeer);
       const result = loadDevJordanChat(user.id);
       setConnection(result.connection);
       setMessages(result.messages);
@@ -175,6 +264,11 @@ export default function ChatScreen() {
       setError(null);
       const peerId = peerIdFromPendingConnection(connectionId);
       const peerProfile = getPublicPeerProfile(peerId);
+      const waveCtx = await loadChatWaveContext(user.id, peerId);
+      setInboxPreview(waveCtx.inboxPreview);
+      setActivityItems(waveCtx.activity);
+      setHasWavedPeer(waveCtx.hasWavedPeer);
+      hydratePendingInboundWave(peerId, waveCtx);
       const result = loadPendingPeerChat(user.id, peerId, peerProfile?.display_name ?? 'Someone');
       setConnection(result.connection);
       setMessages(result.messages);
@@ -210,6 +304,74 @@ export default function ChatScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const refreshReadMap = useCallback(async () => {
+    if (!connectionId) return;
+    const map = await loadConnectionReadMap(connectionId);
+    setReadMap(map);
+  }, [connectionId]);
+
+  useEffect(() => {
+    void refreshReadMap();
+  }, [refreshReadMap, messages.length]);
+
+  const chatMessages = useMemo(
+    () => attachReadStatus(messages, readMap),
+    [messages, readMap],
+  );
+
+  const peerUserId =
+    connection && user
+      ? connection.user_one === user.id
+        ? connection.user_two
+        : connection.user_one
+      : null;
+
+  const showWaveBack = useMemo(() => {
+    if (!peerUserId || !user?.id) return false;
+    return shouldShowWaveBack({
+      peerUserId,
+      userId: user.id,
+      messages,
+      viewerWavedPeer: hasWavedPeer,
+      inboxPreview,
+      activity: activityItems,
+    });
+  }, [peerUserId, user?.id, messages, hasWavedPeer, inboxPreview, activityItems]);
+
+  const canUnwavePeerWave = useMemo(() => {
+    if (!user?.id || !hasWavedPeer) return false;
+    return canUnwaveOutgoingWave(messages, user.id, readMap);
+  }, [user?.id, hasWavedPeer, messages, readMap]);
+
+  useEffect(() => {
+    if (!connectionId || !user?.id || !peerUserId) return;
+
+    const autoIds = autoReadMessageIds(messages, user.id, peerUserId, readMap);
+    if (!autoIds.length) return;
+
+    void markMessagesRead(connectionId, autoIds).then(setReadMap);
+  }, [connectionId, user?.id, peerUserId, messages, readMap]);
+
+  useEffect(() => {
+    readTimersRef.current.forEach(clearTimeout);
+    readTimersRef.current = [];
+
+    if (!connectionId || !user?.id) return;
+
+    for (const message of messages) {
+      if (message.sender_id !== user.id || readMap[message.id]) continue;
+      const timer = setTimeout(() => {
+        void markMessagesRead(connectionId, [message.id]).then(setReadMap);
+      }, MESSAGE_READ_SIM_DELAY_MS);
+      readTimersRef.current.push(timer);
+    }
+
+    return () => {
+      readTimersRef.current.forEach(clearTimeout);
+      readTimersRef.current = [];
+    };
+  }, [connectionId, user?.id, messages, readMap]);
 
   useEffect(() => {
     if (!connectionId || !isSupabaseConfigured || isDevJordanConnection(connectionId) || isPendingConnectionId(connectionId)) return;
@@ -306,12 +468,121 @@ export default function ChatScreen() {
     });
   };
 
-  const reportedId =
-    connection && user
-      ? connection.user_one === user.id
-        ? connection.user_two
-        : connection.user_one
-      : null;
+  const startEditMessage = (message: ChatMessage) => {
+    if (!user?.id || !canEditOwnMessage(message, user.id)) return;
+    setEditingMessageId(message.id);
+    setEditBody(message.body);
+    setError(null);
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditBody('');
+  };
+
+  const saveEditMessage = async () => {
+    if (!user || !connectionId || !editingMessageId || !editBody.trim() || savingEdit) return;
+
+    const original = chatMessages.find((m) => m.id === editingMessageId);
+    if (!original || !canEditOwnMessage(original, user.id)) {
+      setError('This message can no longer be edited.');
+      cancelEditMessage();
+      return;
+    }
+
+    setSavingEdit(true);
+    setError(null);
+    try {
+      if (isDevJordanConnection(connectionId)) {
+        const updated = editDevJordanMessage(editingMessageId, editBody);
+        if (!updated) throw new Error('Message not found');
+        setMessages((prev) => prev.map((m) => (m.id === editingMessageId ? updated : m)));
+      } else if (isPendingConnectionId(connectionId)) {
+        const peerId = peerIdFromPendingConnection(connectionId);
+        const updated = editPendingPeerMessage(peerId, editingMessageId, editBody);
+        if (!updated) throw new Error('Message not found');
+        setMessages((prev) => prev.map((m) => (m.id === editingMessageId ? updated : m)));
+      } else if (isSupabaseConfigured) {
+        await editChatMessage({
+          messageId: editingMessageId,
+          userId: user.id,
+          body: editBody,
+        });
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === editingMessageId ? { ...m, body: editBody.trim() } : m,
+          ),
+        );
+      } else {
+        throw new Error('Chat editing is unavailable.');
+      }
+      cancelEditMessage();
+    } catch (e) {
+      if (e instanceof MessageBlockedError) {
+        setError(e.message);
+      } else {
+        setError(formatUserError(e, 'Could not save edit'));
+      }
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const performUnwave = async () => {
+    if (!user || !peerUserId || unwaving) return;
+    setUnwaving(true);
+    setError(null);
+    try {
+      await unwaveUser(peerUserId, user.id);
+      setHasWavedPeer(false);
+      await load();
+    } catch (e) {
+      setError(formatUserError(e, 'Could not un-wave'));
+    } finally {
+      setUnwaving(false);
+    }
+  };
+
+  const confirmUnwave = () => {
+    if (!canUnwavePeerWave) {
+      Alert.alert('Cannot un-wave', 'They have already seen your wave.');
+      return;
+    }
+    Alert.alert('Un-wave?', 'Remove your wave before they see it.', [
+      { text: 'Keep wave', style: 'cancel' },
+      { text: 'Un-wave', style: 'destructive', onPress: () => void performUnwave() },
+    ]);
+  };
+
+  const handleWaveBack = async () => {
+    if (!user || !peerUserId || wavingBack) return;
+
+    const peerProfile = getPublicPeerProfile(peerUserId);
+    const toDisplayName = peerProfile?.display_name ?? venueName.replace(/ · Dev chat$/, '');
+    const fromDisplayName =
+      (user.user_metadata?.full_name as string | undefined) ??
+      (user.user_metadata?.name as string | undefined) ??
+      'You';
+
+    setWavingBack(true);
+    setError(null);
+    try {
+      await sendWave({
+        fromUserId: user.id,
+        fromDisplayName,
+        toUserId: peerUserId,
+        toDisplayName,
+      });
+      setHasWavedPeer(true);
+      await load();
+    } catch (e) {
+      setError(formatUserError(e, 'Could not wave back'));
+    } finally {
+      setWavingBack(false);
+    }
+  };
+
+  const reportedId = peerUserId;
 
   const handleReportSubmit = async (reason: ReportReasonId, details?: string) => {
     if (!reportedId || !connectionId) return;
@@ -333,12 +604,15 @@ export default function ChatScreen() {
         onPress: async () => {
           if (!checkIn) return;
           try {
-            await performCheckout(refreshCheckIn, {
-              venueId: checkIn.venue_id,
-              venueName: venueName === 'Jordan · Dev chat' ? 'Venue' : venueName,
-              mode: checkIn.mode,
-            });
-            router.replace(mapTabRoute());
+            await performCheckout(
+              refreshCheckIn,
+              {
+                venueId: checkIn.venue_id,
+                venueName: venueName === 'Jordan · Dev chat' ? 'Venue' : venueName,
+                mode: checkIn.mode,
+              },
+              () => router.replace(mapTabRoute()),
+            );
           } catch (e) {
             setError(e instanceof Error ? e.message : 'Checkout failed');
           }
@@ -417,20 +691,67 @@ export default function ChatScreen() {
 
       <Card style={styles.chatCard}>
         <FlatList
-          data={messages}
+          data={chatMessages}
           keyExtractor={(item) => item.id}
           style={styles.list}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => {
             const mine = item.sender_id === user?.id;
+            const isOutgoingWave =
+              mine && user?.id ? messageIsOutgoingWave(item, user.id) : false;
+            const editable =
+              mine && user?.id ? canEditOwnMessage(item, user.id) && !isOutgoingWave : false;
+            const waveUnwaveable = isOutgoingWave && canUnwavePeerWave;
+
+            if (!mine) {
+              return (
+                <View
+                  style={[styles.bubble, styles.theirs, { alignSelf: 'flex-start', maxWidth: '82%', marginBottom: spacing.sm }]}
+                  accessibilityLabel={`Them: ${item.body}`}
+                >
+                  <Text style={styles.bubbleText}>{item.body}</Text>
+                </View>
+              );
+            }
+
             return (
-              <View
-                style={[styles.bubble, mine ? styles.mine : styles.theirs]}
-                accessibilityLabel={mine ? `You: ${item.body}` : `Them: ${item.body}`}
-              >
-                <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
-                  {item.body}
-                </Text>
+              <View style={styles.mineWrap}>
+                <Pressable
+                  onPress={() => {
+                    if (isOutgoingWave) {
+                      confirmUnwave();
+                      return;
+                    }
+                    startEditMessage(item);
+                  }}
+                  disabled={
+                    isOutgoingWave ? !waveUnwaveable || unwaving : !editable || !!editingMessageId
+                  }
+                  style={[
+                    styles.bubblePressable,
+                    editable && styles.bubbleEditable,
+                    waveUnwaveable && styles.bubbleWaveSelectable,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isOutgoingWave
+                      ? waveUnwaveable
+                        ? `Un-wave: ${item.body}`
+                        : `You: ${item.body}${item.read_at ? `, ${CHAT_SEEN_LABEL.toLowerCase()}` : ''}`
+                      : editable
+                        ? `Edit your message: ${item.body}`
+                        : `You: ${item.body}${item.read_at ? `, ${CHAT_SEEN_LABEL.toLowerCase()}` : ''}`
+                  }
+                >
+                  <View style={[styles.bubble, styles.mine]}>
+                    <Text style={[styles.bubbleText, styles.bubbleTextMine]}>
+                      {item.body}
+                    </Text>
+                  </View>
+                </Pressable>
+                {item.read_at ? (
+                  <Text style={styles.readLabel}>{CHAT_SEEN_LABEL}</Text>
+                ) : null}
               </View>
             );
           }}
@@ -440,6 +761,55 @@ export default function ChatScreen() {
         />
 
         <NoticeBar message="Chat logs will delete automatically upon checkout." />
+
+        {showWaveBack ? (
+          <Button
+            title="Wave Back"
+            onPress={handleWaveBack}
+            disabled={wavingBack}
+            style={styles.waveBack}
+            accessibilityLabel="Wave back at this person"
+          />
+        ) : null}
+
+        {canUnwavePeerWave ? (
+          <Button
+            title="Un-Wave"
+            onPress={confirmUnwave}
+            disabled={unwaving}
+            style={styles.unWave}
+            accessibilityLabel="Remove your wave"
+          />
+        ) : null}
+
+        {editingMessageId ? (
+          <View style={styles.editPanel}>
+            <Text style={styles.editHint}>Editing message — only unseen messages can be changed.</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editBody}
+              onChangeText={setEditBody}
+              multiline
+              autoFocus
+              accessibilityLabel="Edit message text"
+            />
+            <View style={styles.editActions}>
+              <Button
+                title="Save"
+                onPress={saveEditMessage}
+                disabled={!editBody.trim() || savingEdit}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Cancel"
+                variant="ghost"
+                onPress={cancelEditMessage}
+                disabled={savingEdit}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        ) : null}
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           {notifyTimer.state === 'pending' && !hasOutgoingMessage ? (

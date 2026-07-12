@@ -10,19 +10,31 @@ import { useScreenBackgroundStyle, useTheme } from '@/contexts/ThemeContext';
 import { useCheckInGate } from '@/hooks/useCheckInGate';
 import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { useWaveAction } from '@/hooks/useWaveAction';
+import { loadMergedActivityItems } from '@/lib/activityFeed';
 import { changeActiveCheckInMode } from '@/lib/checkin';
 import { performCheckout } from '@/lib/checkout';
 import { roomPeerToProfile } from '@/lib/devPeerProfile';
 import { formatUserError } from '@/lib/errors';
+import { loadInboxThreads } from '@/lib/inbox';
+import {
+    findInboxThreadForPeer,
+    peerHasInitiatedInteraction,
+} from '@/lib/inboxAction';
+import { openChatForPeer } from '@/lib/inboxNavigation';
 import { mapTabRoute } from '@/lib/mapNavigation';
+import {
+    cancelNotifyTimer,
+    isNotifyTimerPending,
+    waveNotifyTimerId,
+} from '@/lib/notifyTimerService';
 import { getSameModeOnlyPreference } from '@/lib/preferences';
 import { navigateToPublicProfile } from '@/lib/profileNavigation';
 import { loadRoomData } from '@/lib/room';
-import { MOCK_DISCOVERY_PROFILES, type DiscoveryProfile } from '@/lib/socialMock';
+import { MOCK_DISCOVERY_PROFILES, type ActivityItem, type DiscoveryProfile, type InboxThread } from '@/lib/socialMock';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { roomFeedEmptyMessage, type ModePresenceCounts, type VenuePresenceCounts } from '@/lib/venuePresence';
 import { fetchVenueName } from '@/lib/venues';
-import { loadWavedUserIdSet } from '@/lib/waves';
+import { canUnwavePeer, loadWavedUserIdSet } from '@/lib/waves';
 import type { IntentMode, RoomPeer } from '@/types/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
@@ -63,11 +75,14 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
     useWaveAction();
 
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
+  const [inboxThreads, setInboxThreads] = useState<InboxThread[]>([]);
+  const [activityItems, setActivityItems] = useState<ActivityItem[]>([]);
   const [presence, setPresence] = useState<VenuePresenceCounts | null>(null);
   const [modeCounts, setModeCounts] = useState<ModePresenceCounts | null>(null);
   const [loading, setLoading] = useState(true);
   const [changingMode, setChangingMode] = useState(false);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [unwaveAllowedByPeer, setUnwaveAllowedByPeer] = useState<Record<string, boolean>>({});
 
   const cardHeight = Dimensions.get('window').height - insets.top - insets.bottom - 160;
 
@@ -110,7 +125,32 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
     [user, checkIn, devBypassActive, refreshCheckIn, setActiveMode],
   );
 
+  const refreshUnwaveEligibility = useCallback(
+    async (waved: Set<string>) => {
+      if (!user?.id || !waved.size) {
+        setUnwaveAllowedByPeer({});
+        return;
+      }
+      const entries = await Promise.all(
+        [...waved].map(async (peerId) => [peerId, await canUnwavePeer(user.id, peerId)] as const),
+      );
+      setUnwaveAllowedByPeer(Object.fromEntries(entries));
+    },
+    [user?.id],
+  );
+
+  const loadSocialContext = useCallback(async () => {
+    const [threads, activity] = await Promise.all([
+      user?.id ? loadInboxThreads(user.id) : Promise.resolve([] as InboxThread[]),
+      loadMergedActivityItems(),
+    ]);
+    setInboxThreads(threads);
+    setActivityItems(activity);
+  }, [user?.id]);
+
   const load = useCallback(async () => {
+    await loadSocialContext();
+
     if (!checkIn) {
       setProfiles([]);
       setPresence(null);
@@ -121,6 +161,7 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
 
     const waved = await loadWavedUserIdSet();
     setWavedIds(waved);
+    await refreshUnwaveEligibility(waved);
 
     const sameModeOnly = await getSameModeOnlyPreference();
     const viewerMode = checkIn.mode;
@@ -131,9 +172,10 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
     const fallback = mockProfilesForMode(viewerMode, sameModeOnly);
 
     if (!isSupabaseConfigured) {
-      setProfiles(fallback);
-      setPresence({ total: fallback.length, inMyMode: fallback.length, sameModeOnly });
-      setModeCounts({ friends: 1, networking: 1, dating: 1 });
+      const stub = devBypassActive ? fallback : [];
+      setProfiles(stub);
+      setPresence({ total: stub.length, inMyMode: stub.length, sameModeOnly });
+      setModeCounts({ friends: stub.length ? 1 : 0, networking: stub.length ? 1 : 0, dating: stub.length ? 1 : 0 });
       setLoading(false);
       return;
     }
@@ -154,7 +196,7 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [checkIn, user, setWavedIds]);
+  }, [checkIn, user, setWavedIds, loadSocialContext, refreshUnwaveEligibility]);
 
   useEffect(() => {
     load();
@@ -166,6 +208,11 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
       { user_id: profile.user_id, display_name: profile.display_name },
       { goToInbox: false },
     );
+    await loadSocialContext();
+    if (user) {
+      const waved = await loadWavedUserIdSet();
+      await refreshUnwaveEligibility(waved);
+    }
   };
 
   const handleUnWave = async (profile: DiscoveryProfile) => {
@@ -174,6 +221,25 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
       user_id: profile.user_id,
       display_name: profile.display_name,
     });
+    const waved = await loadWavedUserIdSet();
+    await refreshUnwaveEligibility(waved);
+  };
+
+  const openInbox = async (profile: DiscoveryProfile) => {
+    if (!ensureCheckedIn()) return;
+
+    const timerId = waveNotifyTimerId(profile.user_id);
+    if (isNotifyTimerPending(timerId)) {
+      cancelNotifyTimer(timerId);
+      await handleWave(profile);
+    }
+
+    const [threads] = await Promise.all([
+      user?.id ? loadInboxThreads(user.id) : Promise.resolve([] as InboxThread[]),
+      loadSocialContext(),
+    ]);
+    const thread = findInboxThreadForPeer(threads, profile.user_id);
+    openChatForPeer(router, profile.user_id, thread);
   };
 
   const openProfile = (profile: DiscoveryProfile) => {
@@ -194,11 +260,15 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
         onPress: async () => {
           try {
             const venueName = (await fetchVenueName(checkIn.venue_id)) ?? 'Venue';
-            await performCheckout(refreshCheckIn, {
-              venueId: checkIn.venue_id,
-              venueName,
-              mode: checkIn.mode,
-            });
+            await performCheckout(
+              refreshCheckIn,
+              {
+                venueId: checkIn.venue_id,
+                venueName,
+                mode: checkIn.mode,
+              },
+              () => router.replace(mapTabRoute()),
+            );
           } catch (e) {
             Alert.alert('Checkout failed', formatUserError(e, 'Try again in a moment.'));
           }
@@ -273,8 +343,13 @@ export function RoomFeedScreen({ title = 'Home', onBack }: Props) {
                 onWave={() => handleWave(item)}
                 onUnWave={() => handleUnWave(item)}
                 onOpenProfile={() => openProfile(item)}
+                showInbox={peerHasInitiatedInteraction(item.user_id, inboxThreads, activityItems, {
+                  viewerWaved: wavedIds.has(item.user_id),
+                })}
+                onOpenInbox={() => openInbox(item)}
                 loading={waveLoading}
                 waved={wavedIds.has(item.user_id)}
+                canUnwave={unwaveAllowedByPeer[item.user_id] ?? false}
               />
             </View>
           )}

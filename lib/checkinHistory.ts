@@ -1,4 +1,5 @@
 import { PAST_CHECKINS_KEY } from '@/constants/storage';
+import { isGuestSimulationActive } from '@/lib/guestSimulation';
 import type { IntentMode } from '@/types/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -36,7 +37,8 @@ async function loadStoredPastCheckIns(): Promise<PastCheckIn[]> {
 
 export async function loadPastCheckIns(): Promise<PastCheckIn[]> {
   const stored = await loadStoredPastCheckIns();
-  return stored.length ? stored : MOCK_PAST;
+  if (stored.length) return stored;
+  return isGuestSimulationActive() ? MOCK_PAST : [];
 }
 
 export async function recordPastCheckIn(entry: PastCheckIn): Promise<void> {

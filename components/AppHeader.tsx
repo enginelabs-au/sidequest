@@ -28,7 +28,7 @@ export function AppHeader({
   style,
 }: Props) {
   const { colors } = useTheme();
-  const isPrimary = variant === 'primary';
+  const isMapTitle = variant === 'map';
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -47,30 +47,23 @@ export function AppHeader({
         },
         titleBlock: { flex: 1, alignItems: 'center' },
         title: {
-          color: colors.text,
+          color: colors.accentOnButton,
           fontSize: 17,
           fontWeight: '800',
           letterSpacing: 0.3,
           textAlign: 'center',
         },
-        titlePrimary: {
-          color: colors.accentOnButton,
-        },
         titleMap: {
           fontSize: 18,
           letterSpacing: 0.5,
           textTransform: 'none',
-          color: colors.text,
         },
         subtitle: {
-          color: colors.textMuted,
+          color: colors.accentOnButton,
+          opacity: 0.9,
           fontSize: 12,
           marginTop: 2,
           textAlign: 'center',
-        },
-        subtitlePrimary: {
-          color: colors.accentOnButton,
-          opacity: 0.9,
         },
         iconBtn: {
           width: 44,
@@ -78,20 +71,14 @@ export function AppHeader({
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: 22,
-          backgroundColor: colors.card,
-          borderWidth: 1,
-          borderColor: colors.borderLight,
-        },
-        iconBtnPrimary: {
           backgroundColor: 'transparent',
-          borderWidth: 0,
         },
         iconSpacer: { width: 44 },
       }),
     [colors],
   );
 
-  const iconColor = isPrimary ? colors.accentOnButton : colors.iconMuted;
+  const iconColor = colors.accentOnButton;
 
   const leftPress = onBack ?? onMenu;
   const leftIcon: AppIconName | null = onBack ? 'back' : onMenu ? 'menu' : null;
@@ -99,12 +86,12 @@ export function AppHeader({
   const rightIcon: AppIconName | null = onSettings ? 'settings' : onAction ? actionIcon : null;
 
   return (
-    <View style={[styles.wrap, isPrimary && styles.wrapPrimary, style]}>
+    <View style={[styles.wrap, styles.wrapPrimary, style]}>
       <View style={styles.bar}>
         {leftPress && leftIcon ? (
           <Pressable
             onPress={leftPress}
-            style={[styles.iconBtn, isPrimary && styles.iconBtnPrimary]}
+            style={styles.iconBtn}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={onBack ? 'Go back' : 'Open menu'}
@@ -115,23 +102,13 @@ export function AppHeader({
           <View style={styles.iconSpacer} />
         )}
         <View style={styles.titleBlock}>
-          <Text
-            style={[
-              styles.title,
-              variant === 'map' && styles.titleMap,
-              isPrimary && styles.titlePrimary,
-            ]}
-          >
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text style={[styles.subtitle, isPrimary && styles.subtitlePrimary]}>{subtitle}</Text>
-          ) : null}
+          <Text style={[styles.title, isMapTitle && styles.titleMap]}>{title}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
         {rightPress && rightIcon ? (
           <Pressable
             onPress={rightPress}
-            style={[styles.iconBtn, isPrimary && styles.iconBtnPrimary]}
+            style={styles.iconBtn}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={onSettings ? 'Open settings' : 'Header action'}

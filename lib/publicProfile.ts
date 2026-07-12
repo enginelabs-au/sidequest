@@ -1,4 +1,5 @@
 import { getDevPeerProfile, isDevFakePeer, type PublicPeerProfile } from '@/lib/devPeerProfile';
+import { isGuestSimulationActive } from '@/lib/guestSimulation';
 import type { DiscoveryProfile } from '@/lib/socialMock';
 import { MOCK_DISCOVERY_PROFILES } from '@/lib/socialMock';
 
@@ -42,18 +43,20 @@ function discoveryToPublicProfile(profile: DiscoveryProfile): PublicPeerProfile 
 
 /** Resolves demo + dev public profiles for the peer profile screen. */
 export function getPublicPeerProfile(userId: string): PublicPeerProfile | null {
-  if (isDevFakePeer(userId)) {
-    return getDevPeerProfile(userId);
-  }
+  if (isGuestSimulationActive()) {
+    if (isDevFakePeer(userId)) {
+      return getDevPeerProfile(userId);
+    }
 
-  const discovery = MOCK_DISCOVERY_PROFILES.find((p) => p.user_id === userId);
-  if (discovery) {
-    return discoveryToPublicProfile(discovery);
-  }
+    const discovery = MOCK_DISCOVERY_PROFILES.find((p) => p.user_id === userId);
+    if (discovery) {
+      return discoveryToPublicProfile(discovery);
+    }
 
-  const extra = EXTRA_MOCK_PROFILES[userId];
-  if (extra) {
-    return { user_id: userId, ...extra };
+    const extra = EXTRA_MOCK_PROFILES[userId];
+    if (extra) {
+      return { user_id: userId, ...extra };
+    }
   }
 
   return null;

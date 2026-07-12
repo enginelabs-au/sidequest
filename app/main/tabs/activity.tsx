@@ -4,15 +4,18 @@ import { FilterPills } from '@/components/FilterPills';
 import { SwipeableRow } from '@/components/SwipeableRow';
 import { Card } from '@/components/ui';
 import { colors, spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useScreenBackgroundStyle } from '@/contexts/ThemeContext';
 import { useTabBarInset } from '@/hooks/useTabBarInset';
+import { loadMergedActivityItems } from '@/lib/activityFeed';
+import { hydratePendingInboundWave } from '@/lib/chatWaveContext';
+import { loadInboxThreads } from '@/lib/inbox';
+import { findInboxThreadForPeer } from '@/lib/inboxAction';
+import { openChatForPeer } from '@/lib/inboxNavigation';
 import { navigateToPublicProfile } from '@/lib/profileNavigation';
-import {
-    deleteActivityItem,
-    loadDeletedActivityIds,
-    loadLocalActivityItems,
-} from '@/lib/socialLocal';
-import { MOCK_ACTIVITY_ITEMS, type ActivityItem } from '@/lib/socialMock';
+import { getPublicPeerProfile } from '@/lib/publicProfile';
+import { deleteActivityItem } from '@/lib/socialLocal';
+import type { ActivityItem } from '@/lib/socialMock';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
@@ -26,32 +29,17 @@ function filterActivity(items: ActivityItem[], filter: ActivityFilter): Activity
   return items.filter((i) => i.type !== 'reply');
 }
 
-function mergeActivity(local: ActivityItem[], mock: ActivityItem[]): ActivityItem[] {
-  const seen = new Set<string>();
-  const merged: ActivityItem[] = [];
-  for (const item of [...local, ...mock]) {
-    if (seen.has(item.id)) continue;
-    seen.add(item.id);
-    merged.push(item);
-  }
-  return merged;
-}
-
 export default function ActivityScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const screenStyle = useScreenBackgroundStyle();
   const tabBarInset = useTabBarInset();
   const [filter, setFilter] = useState<ActivityFilter>('all');
-  const [items, setItems] = useState<ActivityItem[]>(MOCK_ACTIVITY_ITEMS);
+  const [items, setItems] = useState<ActivityItem[]>([]);
 
   const load = useCallback(async () => {
-    const [local, deletedIds] = await Promise.all([
-      loadLocalActivityItems(),
-      loadDeletedActivityIds(),
-    ]);
-    const deleted = new Set(deletedIds);
-    setItems(mergeActivity(local, MOCK_ACTIVITY_ITEMS).filter((i) => !deleted.has(i.id)));
+    setItems(await loadMergedActivityItems());
   }, []);
 
   useEffect(() => {
@@ -60,13 +48,25 @@ export default function ActivityScreen() {
 
   const visible = useMemo(() => filterActivity(items, filter), [items, filter]);
 
-  const openItem = (item: ActivityItem) => {
+  const openItem = async (item: ActivityItem) => {
     if (!item.peerUserId) return;
     if (item.type === 'request') {
       router.push({
         pathname: '/main/peer/[userId]',
         params: { userId: item.peerUserId, fromAlert: 'request' },
       });
+      return;
+    }
+    if (item.type === 'wave') {
+      const profile = getPublicPeerProfile(item.peerUserId);
+      hydratePendingInboundWave(item.peerUserId, {
+        inboxPreview: undefined,
+        activity: [item],
+        hasWavedPeer: false,
+      });
+      const threads = user?.id ? await loadInboxThreads(user.id) : [];
+      const thread = findInboxThreadForPeer(threads, item.peerUserId);
+      openChatForPeer(router, item.peerUserId, thread);
       return;
     }
     navigateToPublicProfile(router, item.peerUserId, { checkedIn: true });

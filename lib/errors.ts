@@ -32,6 +32,18 @@ function supabaseErrorMessage(error: PostgrestLike): string | null {
   if (code === 'PGRST301' || /jwt/i.test(msg)) {
     return 'Your session expired. Sign in again, then retry check-in.';
   }
+  if (
+    code === 'phone_provider_disabled' ||
+    /unsupported phone provider|phone provider/i.test(msg)
+  ) {
+    return 'Phone sign-in is not enabled on the server yet. Ask your admin to enable Phone + Twilio in Supabase Dashboard.';
+  }
+  if (code === 'otp_expired' || /otp.*expired|expired.*otp/i.test(msg)) {
+    return 'That code has expired. Tap Resend code to get a new one.';
+  }
+  if (code === 'over_sms_send_rate_limit' || /sms.*rate limit|too many.*sms/i.test(msg)) {
+    return 'Too many codes sent. Wait a minute, then tap Resend code.';
+  }
   return null;
 }
 

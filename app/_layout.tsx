@@ -2,7 +2,7 @@ import { KeyboardDismissView } from '@/components/KeyboardDismissView';
 import { ModeThemeBridge } from '@/components/ModeThemeBridge';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
-import { useAuthDeepLink } from '@/hooks/useAuthDeepLink';
+import { configureNativeAuth } from '@/lib/auth';
 import { checkSupabaseHealth } from '@/lib/healthcheck';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,10 +10,10 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 function RootLayoutInner() {
-  useAuthDeepLink();
   const { colors, isDark } = useTheme();
 
   useEffect(() => {
+    configureNativeAuth();
     checkSupabaseHealth();
   }, []);
 
@@ -22,9 +22,10 @@ function RootLayoutInner() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          headerTitleStyle: { fontWeight: '700' },
+          headerStyle: { backgroundColor: colors.accent },
+          headerTintColor: colors.accentOnButton,
+          headerTitleStyle: { fontWeight: '700', color: colors.accentOnButton },
+          headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
           animation: 'fade',
         }}

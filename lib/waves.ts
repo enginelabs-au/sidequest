@@ -1,4 +1,18 @@
 import { requestConnection } from '@/lib/connections';
+import { DEV_FAKE_PEER_ID } from '@/lib/devFakePeer';
+import {
+    appendDevJordanWave,
+    DEV_JORDAN_CONNECTION_ID,
+    loadDevJordanChat,
+    removeDevJordanOutgoingWave,
+} from '@/lib/devJordanChat';
+import {
+    appendPendingPeerWave,
+    loadPendingPeerChat,
+    removePendingOutgoingWave,
+} from '@/lib/devPendingChat';
+import { isGuestSimulationActive } from '@/lib/guestSimulation';
+import { loadConnectionReadMap } from '@/lib/messageReadStatus';
 import {
     formatTimeLabelNow,
     loadWavedUserIds,
@@ -8,6 +22,7 @@ import {
     upsertLocalInboxThread,
 } from '@/lib/socialLocal';
 import type { InboxThread } from '@/lib/socialMock';
+import { canUnwaveOutgoingWave } from '@/lib/waveChat';
 
 export type SendWaveResult = {
   threadId: string;
@@ -44,6 +59,14 @@ export async function sendWave(params: {
     peerUserId: params.toUserId,
   });
 
+  if (isGuestSimulationActive()) {
+    if (params.toUserId === DEV_FAKE_PEER_ID) {
+      appendDevJordanWave(params.fromUserId, params.toDisplayName);
+    } else {
+      appendPendingPeerWave(params.fromUserId, params.toUserId, params.toDisplayName);
+    }
+  }
+
   try {
     await requestConnection(params.toUserId);
   } catch {
@@ -62,6 +85,32 @@ export async function loadWavedUserIdSet(): Promise<Set<string>> {
   return new Set(await loadWavedUserIds());
 }
 
-export async function unwaveUser(userId: string): Promise<void> {
-  await unmarkUserWaved(userId);
+/** True when viewer waved peer and the peer has not yet seen that wave message. */
+export async function canUnwavePeer(viewerId: string, peerUserId: string): Promise<boolean> {
+  const waved = await hasWavedUser(peerUserId);
+  if (!waved) return false;
+  if (!isGuestSimulationActive()) return true;
+
+  const connectionId =
+    peerUserId === DEV_FAKE_PEER_ID ? DEV_JORDAN_CONNECTION_ID : `pending-${peerUserId}`;
+  const [readMap, messages] = await Promise.all([
+    loadConnectionReadMap(connectionId),
+    Promise.resolve(
+      peerUserId === DEV_FAKE_PEER_ID
+        ? loadDevJordanChat(viewerId).messages
+        : loadPendingPeerChat(viewerId, peerUserId, '').messages,
+    ),
+  ]);
+
+  return canUnwaveOutgoingWave(messages, viewerId, readMap);
+}
+
+export async function unwaveUser(peerUserId: string, fromUserId?: string): Promise<void> {
+  await unmarkUserWaved(peerUserId);
+  if (!fromUserId || !isGuestSimulationActive()) return;
+  if (peerUserId === DEV_FAKE_PEER_ID) {
+    removeDevJordanOutgoingWave(fromUserId);
+  } else {
+    removePendingOutgoingWave(fromUserId, peerUserId);
+  }
 }

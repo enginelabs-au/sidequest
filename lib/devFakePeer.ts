@@ -1,4 +1,5 @@
 import { isDevTestVenue, isDevTestVenueCheckInEnabled } from '@/constants/devVenues';
+import { isGuestSimulationActive } from '@/lib/guestSimulation';
 import type { IntentMode, RoomPeer } from '@/types/database';
 
 /** Friends-mode Ivy test peer (Jordan) — also used for dev inbox/chat. */
@@ -99,7 +100,12 @@ export function createDevFakePeer(): RoomPeer {
 }
 
 export function shouldShowDevFakePeerAtVenue(venue: { name: string } | null | undefined): boolean {
-  return !!venue && isDevTestVenueCheckInEnabled() && isDevTestVenue(venue);
+  return (
+    isGuestSimulationActive() &&
+    !!venue &&
+    isDevTestVenueCheckInEnabled() &&
+    isDevTestVenue(venue)
+  );
 }
 
 export function appendDevFakePeersIfNeeded<T extends { user_id: string }>(

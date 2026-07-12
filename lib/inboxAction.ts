@@ -32,6 +32,17 @@ export function shouldShowProfileInboxAction(
   );
 }
 
+/** Show Inbox beside Wave once either party has started an interaction. */
+export function peerHasInitiatedInteraction(
+  peerUserId: string,
+  threads: InboxThread[],
+  activity: ActivityItem[],
+  options?: { viewerWaved?: boolean },
+): boolean {
+  if (options?.viewerWaved) return true;
+  return shouldShowProfileInboxAction(peerUserId, threads, activity);
+}
+
 /** Green inbox CTA label on a peer profile. */
 export function inboxActionLabelForPeer(
   peerUserId: string,

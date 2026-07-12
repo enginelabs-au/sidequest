@@ -1,6 +1,8 @@
+import { isDevIvyPeerId } from '@/lib/devFakePeer';
+import { isGuestSimulationActive } from '@/lib/guestSimulation';
 import {
-  loadDeletedInboxPeerIds,
-  loadLocalInboxThreads,
+    loadDeletedInboxPeerIds,
+    loadLocalInboxThreads,
 } from '@/lib/socialLocal';
 import { MOCK_INBOX_THREADS, type InboxThread } from '@/lib/socialMock';
 import { supabase } from '@/lib/supabase';
@@ -30,9 +32,19 @@ function applyLocalOverrides(threads: InboxThread[], local: InboxThread[]): Inbo
   });
 }
 
+function isStubPeerId(peerUserId: string): boolean {
+  return peerUserId.startsWith('mock-') || isDevIvyPeerId(peerUserId);
+}
+
+function withoutStubSocialData(threads: InboxThread[]): InboxThread[] {
+  if (isGuestSimulationActive()) return threads;
+  return threads.filter((t) => !isStubPeerId(t.peerUserId));
+}
+
 function mergeInboxSources(remote: InboxThread[], local: InboxThread[]): InboxThread[] {
+  const stub = isGuestSimulationActive() ? MOCK_INBOX_THREADS : [];
   const byPeer = new Map<string, InboxThread>();
-  for (const t of [...local, ...remote, ...MOCK_INBOX_THREADS]) {
+  for (const t of [...local, ...remote, ...stub]) {
     const prev = byPeer.get(t.peerUserId);
     if (!prev) {
       byPeer.set(t.peerUserId, t);
@@ -48,10 +60,11 @@ function mergeInboxSources(remote: InboxThread[], local: InboxThread[]): InboxTh
 }
 
 export async function loadInboxThreads(userId: string): Promise<InboxThread[]> {
-  const [local, deletedPeerIds] = await Promise.all([
+  const [localRaw, deletedPeerIds] = await Promise.all([
     loadLocalInboxThreads(),
     loadDeletedInboxPeerIds(),
   ]);
+  const local = withoutStubSocialData(localRaw);
   const deleted = new Set(deletedPeerIds);
 
   try {

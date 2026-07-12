@@ -14,3 +14,5 @@ export const PAST_CHECKINS_KEY = 'sidequest:pastCheckIns';
 export const DEV_LOCAL_CHECKIN_KEY = 'sidequest:devLocalCheckIn';
 /** User appearance preference: `dark` (default) or `light`. */
 export const APPEARANCE_KEY = 'sidequest:appearance';
+/** Per-connection message read timestamps (message id → ISO read_at). */
+export const CHAT_READ_STATUS_KEY = 'sidequest:chatReadStatus';

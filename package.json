@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-google-signin/google-signin": "^16.1.2",
     "@supabase/supabase-js": "^2.110.1",
     "expo": "~57.0.4",
+    "expo-apple-authentication": "^57.0.0",
     "expo-auth-session": "^57.0.2",
     "expo-constants": "~57.0.3",
     "expo-crypto": "^57.0.0",
@@ -41,8 +43,12 @@
     "typecheck": "tsc --noEmit",
     "db:types": "supabase gen types typescript --linked > types/database.generated.ts",
     "verify:env": "bash scripts/verify-env.sh",
+    "verify:phone-auth": "bash scripts/verify-phone-auth.sh",
     "verify:connections": "bash scripts/verify-connections.sh",
     "test:oauth": "node scripts/test-oauth-providers.mjs",
+    "setup:google-native": "bash scripts/setup-google-native-oauth.sh",
+    "setup:phone-auth": "bash scripts/patch-supabase-phone-auth.sh",
+    "print:supabase-auth": "bash scripts/print-supabase-native-auth.sh",
     "generate:apple-secret": "node scripts/generate-apple-secret.mjs",
     "generate:icons": "python3 scripts/generate-app-icons.py"
   },

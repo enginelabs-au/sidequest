@@ -7,235 +7,206 @@ Configure Supabase Auth for Side Quest (Google, Apple, phone OTP). Live testing 
 1. [`.env`](../.env.example) copied and filled:
    - `EXPO_PUBLIC_SUPABASE_URL`
    - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+   - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (Google native — Web client)
+   - `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` (Google native — iOS client; required for iOS builds)
    - `EXPO_PUBLIC_APP_SCHEME=sidequest` (default)
-   - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (for Google OAuth)
 2. Phase 2 remote push complete (`handle_new_user` trigger live)
-3. App scheme matches [app.config.ts](../app.config.ts): `sidequest`
+3. **Development build required** — native Google/Apple SDKs do not work in Expo Go. Use `npx expo run:ios` / `run:android` or EAS.
 
-## Redirect URLs (Supabase Dashboard)
+## Native sign-in (implemented)
 
-**Authentication → URL Configuration → Redirect URLs**, add:
+Google and Apple use **native OS dialogs** — no browser, no `supabase.co` URL shown to users.
 
-| URL | When |
-|-----|------|
-| `sidequest://auth/callback` | Production / dev client builds |
-| Expo dev URI | Local development |
+| Provider | Library | User sees |
+|----------|---------|-----------|
+| Google | `@react-native-google-signin/google-signin` | Google account picker |
+| Apple (iOS only) | `expo-apple-authentication` | Apple system sheet |
+| Phone | Supabase OTP | SMS code entry |
 
-To find your Expo dev redirect URI, run the app and check logs, or temporarily log in code:
+Flow: native SDK → ID token → `supabase.auth.signInWithIdToken()` → session ([lib/auth.ts](../lib/auth.ts)).
 
-```typescript
-import { makeRedirectUri } from 'expo-auth-session';
-console.log(makeRedirectUri({ scheme: 'sidequest', path: 'auth/callback' }));
+**Verify config:**
+
+```bash
+npm run test:oauth
 ```
 
-Add every variant Supabase and Google/Apple may redirect to. Mismatch is the most common OAuth failure.
+**Rebuild after `.env` or `app.config.ts` changes** (native modules + Google iOS URL scheme):
 
-Canonical redirect path is defined in [lib/auth.ts](../lib/auth.ts) as `auth/callback`, handled by [app/auth/callback.tsx](../app/auth/callback.tsx) and [hooks/useAuthDeepLink.ts](../hooks/useAuthDeepLink.ts).
+```bash
+npx expo prebuild --clean
+npx expo run:ios --device "Free Malware"
+```
+
+## Google native sign-in
+
+### 1. Google Cloud Console
+
+1. [OAuth consent screen](https://console.cloud.google.com/) — app name `Side Quest`, logo, privacy/terms URLs
+2. **Credentials** → create three OAuth clients:
+
+| Type | Purpose | Goes in |
+|------|---------|---------|
+| **Web application** | ID token for Supabase | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` + Supabase Google provider |
+| **iOS** | Native Google on iOS | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` + `app.config.ts` plugin (`iosUrlScheme`) |
+| **Android** | Native Google on Android | Package `au.enginelabs.sidequest` + SHA-1 from your keystore ([PHASE9_SETUP](./PHASE9_SETUP.md)) |
+
+**iOS client:** bundle ID `au.enginelabs.sidequest`
+
+**Android client:** add debug + release SHA-1 fingerprints:
+
+```bash
+# Debug keystore (local dev builds)
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+```
+
+3. Web client **does not** need Supabase redirect URIs for native sign-in (no browser OAuth).
+
+### 2. Supabase Dashboard
+
+**Authentication → Providers → Google**:
+
+| Field | Value |
+|-------|-------|
+| Enable | On |
+| Client ID | Same as `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (Web client) |
+| Client Secret | From Google Web client (Dashboard only — never in app) |
+| **Authorized Client IDs** | Web + iOS IDs comma-separated, e.g. `300778226594-….apps.googleusercontent.com,<ios-client-id>` |
+| **Skip nonce check** | **On** — required for native iOS Google Sign-In (SDK embeds a nonce in the ID token but does not expose the raw value to the app) |
+
+Quick setup: `npm run setup:google-native`
+
+Or patch via API after creating iOS client:
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_... bash scripts/patch-supabase-native-auth.sh
+```
+
+### 3. App
+
+`.env`:
+
+```
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=….apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=….apps.googleusercontent.com
+```
+
+`app.config.ts` auto-derives `iosUrlScheme` (`com.googleusercontent.apps.…`) for the Google Sign-In config plugin.
+
+## Apple native sign-in (iOS only)
+
+Side Quest uses **`expo-apple-authentication`** + `signInWithIdToken` — not browser OAuth.
+
+### 1. Apple Developer
+
+1. [App ID](https://developer.apple.com/account/resources/identifiers/list) `au.enginelabs.sidequest` — enable **Sign in with Apple** (Primary App ID)
+2. **No Services ID or web Return URLs required** for native-only sign-in
+3. `expo-apple-authentication` plugin adds the Sign in with Apple entitlement on prebuild
+
+### 2. Supabase Dashboard
+
+**Authentication → Providers → Apple**:
+
+| Field | Value |
+|-------|-------|
+| Enable | On |
+| **Client IDs** | `au.enginelabs.sidequest,au.enginelabs.sidequest.web` (bundle ID **first**, then Services ID if you keep web secret) |
+
+Native Apple tokens use the **bundle ID** (`au.enginelabs.sidequest`) as audience. If only the Services ID is listed, Apple sign-in returns an audience error.
+
+`lib/auth.ts` generates a random nonce, sends SHA-256 (hex) to Apple, and passes the raw nonce to `signInWithIdToken`.
+
+### 3. Test on device
+
+Tap the **Continue with Apple** system button → Face ID / password → lands in app. No browser hop.
+
+---
+
+### Legacy: browser Apple OAuth (removed)
+
+<details>
+<summary>Previous browser OAuth setup (Services ID, Return URLs) — not used by the app anymore</summary>
+
+See git history or archived steps if you need web-based Apple OAuth. Native sign-in uses bundle ID `au.enginelabs.sidequest` in Supabase **Client IDs** only.
+
+</details>
 
 ## Phone OTP (recommended first for dev)
 
 1. Supabase Dashboard → **Authentication → Providers → Phone**
 2. Enable Phone provider
 3. Configure SMS via **Twilio** (below) or use Supabase test numbers for development
-4. In app: **Continue with phone** → E.164 format (`+61412345678`)
+4. In app: **Continue with phone** → E.164 format (any country, e.g. `+14155552671`, `+61412345678`)
 
 ### Twilio + Supabase Phone (production SMS)
 
-Twilio credentials go in the **Supabase Dashboard only** — not in the mobile `.env`.
+Twilio credentials go in the **Supabase Dashboard only** — not in the mobile `.env`. Keep them in `.env` for local verification scripts only (`scripts/verify-phone-auth.sh`).
 
 1. [Twilio Console](https://console.twilio.com/) → copy **Account SID** (`AC…`) and **Auth Token** from the project home dashboard.
 2. **Messaging Service SID** (`MG…`):
    - **If you already have one:** Console → **Messaging** → **Services** → click your service → **Properties** → **Messaging Service SID** (starts with `MG`).
    - **If you need one:** **Messaging** → **Services** → **Create Messaging Service** → name it (e.g. `Side Quest OTP`) → add your Twilio phone number as sender → finish → copy the **SID** from the service overview.
-3. Supabase → **Authentication → Providers → Phone** → enable Twilio and paste:
-   - Twilio Account SID
+3. Supabase → **Authentication → Providers → Phone** → enable **Phone** + **Enable phone sign-ups** → SMS provider **Twilio** → paste:
+   - Twilio Account SID (`AC…`)
    - Twilio Auth Token
    - Twilio Message Service SID (`MG…`)
-4. Save. Send a test OTP from the app with a real E.164 number (`+61…`).
+4. **Save.** Run `bash scripts/verify-phone-auth.sh` — must not return `phone_provider_disabled`.
 
-**Note:** A bare Twilio phone number alone is not the Messaging Service SID. Supabase expects the `MG…` service SID for reliable OTP delivery.
-
-## Google OAuth
-
-1. [Google Cloud Console](https://console.cloud.google.com/) → OAuth 2.0 credentials
-2. Create **Web client** — copy Client ID to `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
-3. Supabase Dashboard → **Authentication → Providers → Google** — paste Web client ID + secret
-4. For store builds: add iOS bundle ID `au.enginelabs.sidequest` and Android package + SHA-1 (see [PHASE9_SETUP.md](./PHASE9_SETUP.md))
-5. In app: **Continue with Google** — opens browser, returns via `sidequest://auth/callback`
-
-## Apple Sign In (iOS) — OAuth via Supabase
-
-Side Quest uses **browser OAuth** (`signInWithOAuth({ provider: 'apple' })`), not native `expo-apple-authentication`.
-
-Sources: [Apple — Configure Sign in with Apple for the web](https://developer.apple.com/help/account/configure-app-capabilities/configure-sign-in-with-apple-for-the-web/), [Register a Services ID](https://developer.apple.com/help/account/identifiers/register-a-services-id/), [Supabase Apple auth](https://supabase.com/docs/guides/auth/social-login/auth-apple#configuration-web-oauth).
-
-### What you need
-
-| Artifact | Apple Developer location | Used in Supabase |
-|----------|--------------------------|------------------|
-| Team ID | Membership | Secret generator |
-| **Primary** App ID | Identifiers → App IDs | Links Services ID + Key |
-| Services ID | Identifiers → Services IDs | **Client ID** |
-| Signing Key (`.p8`) | **Keys** (left sidebar) | Generate **Secret Key** |
-
----
-
-### Step 1 — Team ID
-
-[developer.apple.com/account](https://developer.apple.com/account) → **Membership** → copy **Team ID** (10 characters).
-
----
-
-### Step 2 — App ID (enable as **Primary**)
-
-1. [Identifiers](https://developer.apple.com/account/resources/identifiers/list) → **+** → **App IDs** → Continue
-2. Description: `Side Quest`
-3. Bundle ID: **Explicit** → `au.enginelabs.sidequest`
-4. Capabilities: enable **Sign in with Apple**
-   - When prompted, choose **Enable as a primary App ID** (not “group with existing” unless you already have a primary for this app family)
-   - Leave **Server-to-Server notification endpoint** blank (Supabase does not use it)
-5. Continue → Register
-
-This step does **not** create a `.p8` key.
-
----
-
-### Step 3 — Register Services ID (no web config yet)
-
-Per [Register a Services ID](https://developer.apple.com/help/account/identifiers/register-a-services-id/) — register first, configure **after** from the list.
-
-1. [Identifiers](https://developer.apple.com/account/resources/identifiers/list) → **+** → **Services IDs** → Continue
-2. Description: `Side Quest Web Auth`
-3. Identifier: e.g. `au.enginelabs.sidequest.web` (reverse-DNS; unique in your team)
-4. Continue → **Register**
-
-Do **not** expect domain/return URL fields on this screen — they appear in Step 4.
-
----
-
-### Step 4 — Configure web auth on the Services ID (this is the step that often fails)
-
-Apple’s flow: **select the Services ID from the list**, then configure.
-
-1. Open [Services IDs list](https://developer.apple.com/account/resources/identifiers/list/serviceId) (or Identifiers → filter **Services IDs** top-right)
-2. **Click the Services ID you just registered** (e.g. `au.enginelabs.sidequest.web`) — opens its detail/edit page
-3. Check **Sign in with Apple** → click **Configure** (opens **Web Authentication Configuration** modal)
-4. **Primary App ID:** select `au.enginelabs.sidequest`
-5. **Website URLs** — the modal has separate fields (do not mix formats):
-
-   | Field | Correct value for Side Quest | Wrong (causes errors) |
-   |-------|------------------------------|------------------------|
-   | **Domains and Subdomains** | `xzfxkybnjzlpguespkco.supabase.co` | `https://xzfxkybnjzlpguespkco.supabase.co` |
-   | **Return URLs** | `https://xzfxkybnjzlpguespkco.supabase.co/auth/v1/callback` | bare domain, or missing `https://` |
-
-   Rules from Apple docs:
-   - Domains: hostname only, **no** `https://`, **no** trailing `/`
-   - Return URLs: **absolute** URI with `https://`, host, and path ([Apple documentation](https://developer.apple.com/documentation/signinwithapple/configuring-your-environment-for-sign-in-with-apple))
-   - If the UI only shows one comma-delimited box, enter domain and return URL as separate comma-separated entries using the formats above
-
-6. Modal: **Done**
-7. Services ID page: **Continue** → **Save** (required — skipping Save drops the config)
-
-**If Return URLs won’t stick or you get `invalid redirect_uri`:** Apple sometimes strips `https://` when editing an existing Services ID. Delete the Services ID, recreate it, and enter the return URL with `https://` on first setup ([Apple Developer Forums](https://developer.apple.com/forums/thread/132915)).
-
-Copy the **Services ID identifier** (e.g. `au.enginelabs.sidequest.web`) — this is Supabase **Client ID**, **not** the App ID / bundle ID.
-
----
-
-### Step 5 — Signing Key (`.p8`) — Keys section, not Identifiers
-
-Per Apple: create a private key in **Keys**, associated with your primary App ID.
-
-1. [Keys](https://developer.apple.com/account/resources/authkeys/list) → **+**
-2. **Key Name** — a human-readable label **for your reference only** (Apple docs: “name is for your reference only and isn’t part of the key itself”):
-   - Use e.g. `Side Quest Apple Auth` or `SideQuestAppleAuth`
-   - **Do not** put `au.enginelabs.sidequest` here — that is the App ID / bundle ID, not a key name
-   - **Avoid dots** (`.`) in the Key Name — `au.enginelabs.sidequest` triggers **“invalid name”**
-   - Avoid special characters; stick to letters, numbers, and spaces
-3. Enable **Sign in with Apple** → click **Configure** (separate step)
-4. In **Configure Key** modal: **Primary App ID** → select `au.enginelabs.sidequest` from the **dropdown** (do not type into Key Name)
-5. Modal → **Save** → back on key page → **Continue** → **Register**
-6. **Download** `AuthKey_XXXXXXXXXX.p8` (one-time download)
-7. Note **Key ID** from the Keys list (10 characters)
-
-| Field on Keys page | What to enter |
-|--------------------|---------------|
-| **Key Name** | `Side Quest Apple Auth` (friendly label) |
-| **Configure → Primary App ID** | `au.enginelabs.sidequest` (from dropdown) |
-
-
----
-
-### Step 6 — Generate Apple **Client Secret**
-
-Supabase needs two values for Apple: **Client ID** (Services ID) and **Client Secret** (a JWT you generate — not the raw `.p8` file).
-
-| Supabase field | Apple name | Your value |
-|----------------|------------|------------|
-| **Client IDs** | Client ID / Services ID | `au.enginelabs.sidequest.web` (from Step 4) |
-| **Secret Key** | Client Secret | JWT generated below |
-
-1. Open the **Generate Apple client secret** tool in [Supabase Apple auth docs](https://supabase.com/docs/guides/auth/social-login/auth-apple#configuration-web-oauth) (Chrome/Firefox — Safari often fails)
-2. Fill in:
-
-   | Generator input | Where you have it |
-   |-----------------|-------------------|
-   | Team ID | `.env` → `APPLE_TEAM_ID` |
-   | Key ID | `.env` → `APPLE_AUTH_KEY_ID` |
-   | Client ID | **Services ID** e.g. `au.enginelabs.sidequest.web` (not the App ID) |
-   | Private key | `.env` → `APPLE_AUTH_KEY` contents, or upload the `.p8` file |
-
-3. Click generate → copy the long JWT string — this is your **Client Secret**
-
-**Note:** The Client Secret expires every **6 months**. Regenerate with the same `.p8` / `APPLE_AUTH_KEY` and update Supabase. Store Team ID, Key ID, Services ID, and `.p8` in `.env` for reference only — the mobile app never reads them; only Supabase Dashboard uses Client ID + Client Secret.
-
----
-
-### Step 7 — Supabase Dashboard (Client ID + Client Secret)
-
-**Authentication → Providers → Apple**:
-
-| Supabase field | Paste |
-|----------------|-------|
-| Enable | On |
-| **Client IDs** | `au.enginelabs.sidequest.web` (Apple **Client ID** = Services ID) |
-| **Secret Key** | JWT from Step 6 (Apple **Client Secret**) |
-
-**Authentication → URL Configuration → Redirect URLs** — confirm:
-
-```
-sidequest://auth/callback
-```
-
----
-
-### Step 8 — Test in app
+Or patch via API (uses Twilio vars from `.env`):
 
 ```bash
-npm start
+bash scripts/patch-supabase-phone-auth.sh
 ```
 
-On iOS: tap **Continue with Apple** → browser consent → should return via `sidequest://auth/callback` and land on venue screen (new user) or room (if checked in).
+**SMS copy:** Supabase sends the text (not Twilio’s default). Edit **Authentication → Providers → Phone → SMS template**, or set via the patch script. Current message: `Side Quest: Your code is 123456` (single code, no duplicate line).
 
-Verify in Supabase **Authentication → Users** that a new user appears after sign-in.
+5. Test from app with a real E.164 number.
 
+**Common mistake:** Pasting a **phone number SID** (`PN…`) or raw `+1…` number into the Message Service SID field. Supabase needs the **Messaging Service** SID (`MG…`). Your service is named `sidequest` in Twilio.
 
-### Troubleshooting
+**Verify wiring:**
+
+```bash
+bash scripts/verify-phone-auth.sh
+```
+
+### International users (non-Australia)
+
+Side Quest accepts any valid E.164 number (`+` + country code + number). The app does **not** default to `+61` in the input.
+
+**Twilio setup for global OTP:**
+
+1. **Geo Permissions** (required) — [SMS Geo Permissions](https://www.twilio.com/docs/messaging/guides/sms-geo-permissions)
+   - Console → **Messaging** → **Settings** → **Geo Permissions**
+   - By default, only your **home country** (from signup verification) is enabled.
+   - Enable every destination country your users may sign in from (e.g. United States, United Kingdom, New Zealand, Canada, etc.).
+   - **Save geo permissions** (Account Owner/Admin only).
+   - Disabled destinations return Twilio error **21408**.
+
+2. **Trial vs paid account**
+   - **Trial:** SMS only to [Verified Caller IDs](https://console.twilio.com/us1/develop/phone-numbers/manage/verified) — add each test handset manually.
+   - **Production:** Upgrade account + add billing to send OTP to arbitrary numbers worldwide (subject to geo permissions).
+
+3. **Messaging Service sender pool**
+   - Keep your US (or local) SMS number in the `sidequest` Messaging Service sender pool.
+   - One long-code sender can reach many countries when geo permissions allow it.
+   - For high volume per country, consider in-country numbers or short codes later ([Twilio Messaging Services](https://www.twilio.com/docs/messaging/services)).
+
+4. **Supabase rate limits**
+   - Dashboard → **Authentication → Rate limits** — default 1 OTP / 60s per number; adjust before launch.
+
+5. **Regulations**
+   - Some countries require sender registration (e.g. US A2P 10DLC, India DLT). Review [country SMS guidelines](https://www.twilio.com/docs/glossary/what-is-an-sms-gateway) before enabling geo permissions for those markets.
+
+### Phone auth troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| No **Configure** button on Services ID | Register first (Step 3), then open the Services ID from the [list](https://developer.apple.com/account/resources/identifiers/list/serviceId) |
-| **Invalid domain** | Remove `https://` from Domains field |
-| **`invalid redirect_uri`** | Return URL must match exactly; recreate Services ID if Apple stripped `https://` |
-| OAuth uses wrong client | Supabase **Client IDs** = Services ID, not `au.enginelabs.sidequest` |
-| No `.p8` from App ID wizard | Keys are only created under **Keys** (Step 5) |
-| **Invalid name** when creating Key | You entered the bundle ID in **Key Name** — use `Side Quest Apple Auth`; put `au.enginelabs.sidequest` only in **Configure → Primary App ID** dropdown |
-
-### Maintenance
-
-Regenerate the Supabase secret every **6 months** with the same `.p8` file.
-
-
+| `phone_provider_disabled` from Supabase | Enable Phone provider + Twilio in Dashboard; click **Save** |
+| Twilio `invalid Messaging Service Sid` | Use `MG…`, not `PN…` or phone number |
+| Twilio error **21408** | Enable destination country in Geo Permissions |
+| Trial: SMS never arrives | Add recipient under **Verified Caller IDs** |
+| `Unsupported phone provider` in app | Same as `phone_provider_disabled` — Dashboard config |
 
 ## Profile creation
 
@@ -261,8 +232,8 @@ Sign out ([contexts/AuthContext.tsx](../contexts/AuthContext.tsx)) clears sessio
 Run in this order:
 
 - [ ] Phone OTP: send + verify on simulator or device
-- [ ] Google OAuth: full flow on iOS and Android
-- [ ] Apple OAuth: full flow on iOS
+- [ ] Google native: account picker on iOS and Android (dev build, not Expo Go)
+- [ ] Apple native: system sheet on iOS
 - [ ] Kill and reopen app — session persists (`AsyncStorage`)
 - [ ] New user has `profiles` row in Supabase Table Editor
 - [ ] Signed-in user without check-in lands on venue screen

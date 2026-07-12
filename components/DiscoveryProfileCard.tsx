@@ -1,3 +1,4 @@
+import { AppIcon } from '@/components/AppIcon';
 import { ModePhotoTag } from '@/components/ModePhotoTag';
 import { WaveButton } from '@/components/WaveButton';
 import { WavePhotoTag } from '@/components/WavePhotoTag';
@@ -14,8 +15,11 @@ type Props = {
   onUnWave: () => void;
   onAttemptWave?: () => boolean;
   onOpenProfile: () => void;
+  onOpenInbox?: () => void;
+  showInbox?: boolean;
   loading?: boolean;
   waved?: boolean;
+  canUnwave?: boolean;
 };
 
 function initials(name: string): string {
@@ -33,8 +37,11 @@ export function DiscoveryProfileCard({
   onUnWave,
   onAttemptWave,
   onOpenProfile,
+  onOpenInbox,
+  showInbox,
   loading,
   waved,
+  canUnwave,
 }: Props) {
   const { colors } = useTheme();
   const title = profile.age ? `${profile.display_name}, ${profile.age}` : profile.display_name;
@@ -71,7 +78,27 @@ export function DiscoveryProfileCard({
           alignItems: 'center',
           justifyContent: 'center',
           marginTop: spacing.sm,
+          width: '100%',
         },
+        actionsRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          width: '100%',
+        },
+        waveSlot: {
+          flex: 1,
+          minWidth: 0,
+        },
+        inboxBubble: {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: colors.purple,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        inboxBubbleDisabled: { opacity: 0.55 },
       }),
     [colors],
   );
@@ -98,15 +125,29 @@ export function DiscoveryProfileCard({
           <Text style={styles.bio}>{profile.bio}</Text>
           <TagRow tags={profile.tags} />
         </Pressable>
-        <View style={styles.actions}>
-          <WaveButton
-            peerUserId={profile.user_id}
-            waved={!!waved}
-            onSendWave={onWave}
-            onUnWave={onUnWave}
-            onAttemptWave={onAttemptWave}
-            disabled={loading}
-          />
+        <View style={[styles.actions, showInbox && styles.actionsRow]}>
+          <View style={showInbox ? styles.waveSlot : undefined}>
+            <WaveButton
+              peerUserId={profile.user_id}
+              waved={!!waved}
+              canUnwave={canUnwave ?? true}
+              onSendWave={onWave}
+              onUnWave={onUnWave}
+              onAttemptWave={onAttemptWave}
+              disabled={loading}
+            />
+          </View>
+          {showInbox && onOpenInbox ? (
+            <Pressable
+              onPress={onOpenInbox}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel={`Open inbox chat with ${profile.display_name}`}
+              style={[styles.inboxBubble, loading && styles.inboxBubbleDisabled]}
+            >
+              <AppIcon name="inbox" size={20} color={colors.onPurple} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </View>

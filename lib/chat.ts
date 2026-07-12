@@ -72,6 +72,27 @@ export async function sendChatMessage(params: {
   if (error) throw error;
 }
 
+export async function editChatMessage(params: {
+  messageId: string;
+  userId: string;
+  body: string;
+}): Promise<void> {
+  const text = sanitizeMessage(params.body);
+  if (!text) return;
+
+  if (containsBlockedContent(text)) {
+    throw new MessageBlockedError('Message blocked by safety filter. Please revise.');
+  }
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ body: text })
+    .eq('id', params.messageId)
+    .eq('sender_id', params.userId);
+
+  if (error) throw error;
+}
+
 export function appendMessageDeduped(prev: Message[], incoming: Message): Message[] {
   if (prev.some((m) => m.id === incoming.id)) return prev;
   return [...prev, incoming];

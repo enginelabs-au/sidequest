@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Probe Supabase OAuth providers — verifies Google/Apple return authorize URLs.
- * Does not complete sign-in (requires browser/device).
+ * Verify native auth configuration (Google/Apple env + Supabase providers).
+ * Does not complete sign-in (requires device).
  */
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
@@ -9,6 +9,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function googleIosUrlScheme(iosClientId) {
+  if (!iosClientId?.trim()) return undefined;
+  const match = iosClientId.trim().match(/^([\w-]+)\.apps\.googleusercontent\.com$/);
+  return match ? `com.googleusercontent.apps.${match[1]}` : undefined;
+}
 
 function loadEnv(file) {
   const env = {};
@@ -42,86 +48,68 @@ const root = path.join(__dirname, '..');
 const env = loadEnv(path.join(root, '.env'));
 const url = env.EXPO_PUBLIC_SUPABASE_URL;
 const anonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-const redirectTo = `${env.EXPO_PUBLIC_APP_SCHEME || 'sidequest'}://auth/callback`;
+const googleWeb = env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim();
+const googleIos = env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
+const iosScheme = googleIosUrlScheme(googleIos);
 
 if (!url || !anonKey) {
   console.error('FAIL: missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY');
   process.exit(1);
 }
 
+let fail = 0;
+
+console.log('=== Native auth configuration ===\n');
+
+if (!googleWeb) {
+  console.log('FAIL: EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID missing (required for Google native sign-in)');
+  fail++;
+} else {
+  console.log(`OK: Google Web client ID set (${googleWeb.slice(0, 12)}…)`);
+}
+
+if (!googleIos) {
+  console.log('WARN: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID missing — required for iOS Google Sign-In builds');
+} else if (!iosScheme) {
+  console.log('FAIL: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID format invalid');
+  fail++;
+} else {
+  console.log(`OK: Google iOS client ID set; iosUrlScheme=${iosScheme}`);
+}
+
 const supabase = createClient(url, anonKey);
 
-async function probe(provider) {
-  const { data, error } = await supabase.auth.signInWithOAuth({
+async function probeProvider(provider) {
+  const { error } = await supabase.auth.signInWithIdToken({
     provider,
-    options: { redirectTo, skipBrowserRedirect: true },
+    token: 'invalid-token-for-probe',
   });
-  if (error) {
-    return { ok: false, error: error.message };
+  if (!error) return { ok: false, error: 'unexpected success with invalid token' };
+  const msg = error.message.toLowerCase();
+  if (msg.includes('invalid') || msg.includes('jwt') || msg.includes('token')) {
+    return { ok: true };
   }
-  if (!data?.url) {
-    return { ok: false, error: 'No authorize URL returned' };
+  if (msg.includes('provider') && msg.includes('disabled')) {
+    return { ok: false, error: `${provider} provider disabled in Supabase Dashboard` };
   }
-  let parsed;
-  try {
-    parsed = new URL(data.url);
-  } catch {
-    return { ok: false, error: 'Invalid authorize URL' };
-  }
-  return { ok: true, host: parsed.host, url: data.url };
+  return { ok: true, note: error.message };
 }
 
 (async () => {
-  console.log('=== OAuth provider probe ===');
-  console.log(`redirectTo: ${redirectTo}`);
-  console.log('');
-
-  let fail = 0;
-
   for (const provider of ['google', 'apple']) {
-    const result = await probe(provider);
+    const result = await probeProvider(provider);
     if (!result.ok) {
       console.log(`FAIL: ${provider} — ${result.error}`);
       fail++;
-      continue;
-    }
-    console.log(`OK: ${provider} Supabase authorize URL generated`);
-
-    const res = await fetch(result.url, { redirect: 'manual' });
-    const loc = res.headers.get('location') || '';
-    if (res.status === 400) {
-      const body = await res.text();
-      let msg = body;
-      try {
-        msg = JSON.parse(body).msg || body;
-      } catch {}
-      console.log(`FAIL: ${provider} — Supabase rejected authorize: ${msg}`);
-      fail++;
-      continue;
-    }
-    if (res.status >= 300 && res.status < 400 && loc) {
-      const host = new URL(loc).host;
-      console.log(`OK: ${provider} redirects to ${host}`);
-      if (provider === 'google' && host.includes('google')) {
-        const cid = new URL(loc).searchParams.get('client_id');
-        if (cid?.includes('googleusercontent.com')) {
-          console.log(`OK: ${provider} client_id configured`);
-        }
-      }
-      if (provider === 'apple' && host.includes('apple')) {
-        const cid = new URL(loc).searchParams.get('client_id');
-        if (cid) console.log(`OK: ${provider} client_id — ${cid}`);
-      }
     } else {
-      console.log(`WARN: ${provider} unexpected authorize response HTTP ${res.status}`);
+      console.log(`OK: ${provider} provider reachable in Supabase${result.note ? ` (${result.note})` : ''}`);
     }
-    console.log('');
   }
 
+  console.log('');
   if (fail > 0) {
-    console.log(`Result: FAILED (${fail} provider(s))`);
+    console.log(`Result: FAILED (${fail} check(s))`);
     process.exit(1);
   }
-  console.log('Result: OAuth providers configured — authorize URLs generated');
-  console.log('Note: Full sign-in requires device/simulator browser flow (npm start)');
+  console.log('Result: Native auth config looks good — test sign-in on a dev build (not Expo Go)');
 })();

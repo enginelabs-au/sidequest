@@ -176,7 +176,9 @@ export type Database = {
           body: string;
           created_at?: string;
         };
-        Update: never;
+        Update: {
+          body?: string;
+        };
         Relationships: [];
       };
       reports: {
@@ -229,6 +231,10 @@ export type Database = {
         Returns: undefined;
       };
       checkout_user: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      delete_own_account: {
         Args: Record<PropertyKey, never>;
         Returns: undefined;
       };
