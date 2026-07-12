@@ -12,3 +12,15 @@
 - **Phase 7 validation (2026-07-09):** `lib/chat.ts`, `lib/checkout.ts`, chat screen refactor, auto-checkout on main layout, `docs/PHASE7_CHAT.md`; live chat/checkout deferred.
 - **Phase 8 validation (2026-07-09):** `lib/safety.ts`, report/block modals, check-in tooltip, privacy strings, `docs/PHASE8_SAFETY.md`; live report/block deferred.
 - **Docs audit (2026-07-09):** `docs/FINAL_CHECKLIST.md`, `docs/PHASE2_DATABASE.md`; enhanced `.env.example` + `verify:env`; no code gaps — awaiting user `.env` for push/E2E.
+- **Git (2026-07-09):** pushed `master` to `https://github.com/enginelabs-au/sidequest.git` — commit `6e30725`; `.env` not committed (gitignored).
+- **Supabase remote (2026-07-09):** linked `xzfxkybnjzlpguespkco`; `db push` applied 7 migrations; seed via `psql` → 5 venues; `verify:env` passes Supabase + legal URLs.
+- **Legal (2026-07-09):** `docs/legal/privacy.html`, `terms.html`, `index.html` pushed `62a6e67`; GitHub Pages API blocked (org plan); user must enable Settings → Pages `master`/`/docs` or alternate host.
+- **Pending:** `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`; Supabase Auth providers + redirect URLs; live E2E Phases 3–8.
+- **Connections (2026-07-09):** `npm run verify:connections` — Supabase REST/Auth OK, 5 venues, DB smoke OK; legal URLs 404 (Pages not live); removed `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_SECRET` from `.env`.
+- **2026-07-10:** GitHub Pages live (legal HTTP 200); bundle ID `au.enginelabs.sidequest`; Twilio docs in PHASE3_AUTH; all `verify:connections` checks pass.
+- **OAuth probe (2026-07-10):** `npm run test:oauth` — Google OK (`accounts.google.com`); Apple FAIL (`provider is not enabled` on Supabase). Added `test-oauth-providers.mjs`, `load-dotenv.sh`.
+- **UI theme (2026-07-10):** Light design system from mockup — `constants/theme.ts`, `components/ui.tsx` (`Card`, `SegmentedControl`, `Tag`, `NoticeBar`, etc.); all screens migrated; mockup at `design/ui/sidequest-ui-mockup-v1.png`; `app.config.ts` `userInterfaceStyle: 'light'`, splash `#F0F2F5`; `npm run typecheck` pass.
+- **UI features v2 (2026-07-10):** Social Radar map, mode screen, Room card stack/timer/message bar; mockup v2.
+- **UI features v3 (2026-07-10):** Core mechanics — proximity pill, venue marker rail, recenter FAB, vertical mode cards + Confirm & check in, Room deck/list toggle, CheckedInStrip, PeerListRow; mockup `design/ui/sidequest-ui-mockup-v3-core-mechanics.png`.
+- **Social Radar overhaul (2026-07-11):** Full-screen map + safe-area overlays; Google Places search (`MapSearchBar`, `lib/googlePlaces.ts`); Snapchat-style heat tiers (`lib/mapHeat.ts`); venue profile before check-in (`venue/[venueId].tsx`); `docs/GOOGLE_MAPS_SETUP.md`; `SafeAreaProvider` in `app/_layout.tsx`; `npm run typecheck` pass.
+- **Radar loading + Google signals (2026-07-12):** Fixed stuck "Scanning social radar" (location timeout + map no longer blocked on GPS); Google Places `matchVenues` for open/popularity labels (no live busyness in official API); venue cards show "Google · Popular" etc.

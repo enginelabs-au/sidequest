@@ -1,3 +1,4 @@
+import { isDevTestVenue, isDevTestVenueCheckInEnabled } from '@/constants/devVenues';
 import { VENUE_MAX_DISTANCE_KM } from '@/constants/theme';
 
 const EARTH_RADIUS_KM = 6371;
@@ -27,6 +28,16 @@ export function isWithinVenueRange(
   maxKm = VENUE_MAX_DISTANCE_KM,
 ): boolean {
   return haversineDistanceKm(user, venue) <= maxKm;
+}
+
+/** True when user may check in at this venue (Ivy bypass in dev; 1 km for all others). */
+export function canCheckInAtVenue(
+  user: Coordinates | null,
+  venue: Coordinates & { name: string },
+): boolean {
+  if (isDevTestVenueCheckInEnabled() && isDevTestVenue(venue)) return true;
+  if (!user) return false;
+  return isWithinVenueRange(user, venue);
 }
 
 export function formatDistanceKm(km: number): string {

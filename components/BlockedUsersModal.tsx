@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui';
-import { colors, radius, spacing } from '@/constants/theme';
+import { Button, Card } from '@/components/ui';
+import { colors, spacing } from '@/constants/theme';
 import { fetchMyBlocks, type BlockedUserRow } from '@/lib/safety';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -60,7 +60,7 @@ export function BlockedUsersModal({ visible, onClose }: Props) {
       accessibilityViewIsModal
     >
       <View style={styles.backdrop}>
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <Text style={styles.title}>Blocked users</Text>
           <Text style={styles.subtitle}>
             People you blocked won't appear in your room. Unblock is not available in this MVP.
@@ -101,7 +101,7 @@ export function BlockedUsersModal({ visible, onClose }: Props) {
             accessibilityLabel="Close blocked users list"
             style={styles.close}
           />
-        </View>
+        </Card>
       </View>
     </Modal>
   );
@@ -110,18 +110,11 @@ export function BlockedUsersModal({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     padding: spacing.lg,
   },
-  card: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    maxHeight: '80%',
-  },
+  card: { marginBottom: 0, maxHeight: '80%' },
   title: {
     color: colors.text,
     fontSize: 20,

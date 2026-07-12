@@ -16,7 +16,9 @@ App config lives in [`app.config.ts`](app.config.ts), not `app.json`. It defines
 npx expo config --type public
 ```
 
-Environment variables are loaded from `.env` (copy from [`.env.example`](.env.example)). Only `EXPO_PUBLIC_*` keys belong in the mobile client.
+Environment variables are loaded from `.env` (copy from [`.env.example`](.env.example)).
+
+**Client-safe `EXPO_PUBLIC_` vars:** Supabase URL/anon key, app scheme, Google OAuth Web client ID, legal URLs. Everything else (dev bypass, Places dev key, maps SDK keys, OAuth secrets) uses non-public names and/or Supabase Edge Function secrets. Run `bash scripts/check-expo-public-safety.sh` to audit `.env`.
 
 ## Quick start
 

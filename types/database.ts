@@ -211,6 +211,15 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: RoomPeer[];
       };
+      get_venue_attendees: {
+        Args: { p_venue_id: string };
+        Returns: {
+          user_id: string;
+          display_name: string | null;
+          mode: string;
+          group_size: string;
+        }[];
+      };
       request_connection: {
         Args: { target_user_id: string };
         Returns: Connection;

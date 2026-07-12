@@ -1,6 +1,9 @@
 import { CHECK_IN_DURATION_HOURS } from '@/constants/theme';
+import { ensureProfile } from '@/lib/auth';
+import { saveDevLocalCheckIn, updateDevLocalCheckInMode } from '@/lib/devLocalCheckIn';
 import { supabase } from '@/lib/supabase';
 import type { CheckIn, Database, GroupSize, IntentMode, Profile } from '@/types/database';
+import type { Session } from '@supabase/supabase-js';
 
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 type ProfileUpsertPatch = Omit<ProfileInsert, 'id'>;
@@ -35,8 +38,29 @@ export async function loadProfile(userId: string): Promise<Profile | null> {
     .select('*')
     .eq('id', userId)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
   return (data as Profile) ?? null;
+}
+
+/** Ensures a profile row exists, then returns form fields (never hard-fails check-in). */
+export async function loadProfileFormFields(
+  userId: string,
+  fallbackDisplayName: string,
+): Promise<CheckInFormFields> {
+  try {
+    await ensureProfile();
+  } catch {
+    // Continue with fallback when ensure fails (offline / race).
+  }
+  try {
+    const profile = await loadProfile(userId);
+    return profileToFormFields(profile, fallbackDisplayName);
+  } catch {
+    return profileToFormFields(null, fallbackDisplayName);
+  }
 }
 
 export async function clearOwnCheckIns(userId: string): Promise<void> {
@@ -73,6 +97,20 @@ export function buildModeProfileUpdate(
         dating_chemistry_notes: fields.datingChemistry.trim() || null,
       };
   }
+}
+
+/** User-facing hint when the check-in button is inactive due to missing fields. */
+export function checkInDisabledHint(
+  mode: IntentMode,
+  fields: CheckInFormFields,
+  opts?: { needsAuth?: boolean },
+): string {
+  const validation = validateCheckInForm(mode, fields);
+  if (validation) return validation;
+  if (opts?.needsAuth) {
+    return 'Sign in with Apple, Google, or phone to check in and save to the room.';
+  }
+  return 'Complete all required fields marked with * to check in.';
 }
 
 export function validateCheckInForm(mode: IntentMode, fields: CheckInFormFields): string | null {
@@ -125,15 +163,55 @@ export function profileToFormFields(
   };
 }
 
+export async function updateFullProfile(userId: string, fields: CheckInFormFields): Promise<void> {
+  if (!fields.displayName.trim()) {
+    throw new Error('Display name is required.');
+  }
+
+  const profilePatch: ProfileInsert = {
+    id: userId,
+    display_name: fields.displayName.trim(),
+    friends_interests: parseTags(fields.friendsInterests),
+    friends_music: parseTags(fields.friendsMusic),
+    friends_hobbies: parseTags(fields.friendsHobbies),
+    friends_fun_facts: fields.friendsFunFacts.trim() || null,
+    networking_role: fields.networkingRole.trim() || null,
+    networking_industry: fields.networkingIndustry.trim() || null,
+    networking_skills: parseTags(fields.networkingSkills),
+    dating_aesthetic: fields.datingAesthetic.trim() || null,
+    dating_chemistry_notes: fields.datingChemistry.trim() || null,
+  };
+
+  const { error } = await supabase.from('profiles').upsert(profilePatch);
+  if (error) throw error;
+}
+
 export async function submitCheckIn(params: {
   userId: string;
   venueId: string;
   mode: IntentMode;
   groupSize: GroupSize;
   fields: CheckInFormFields;
+  session: Session | null;
+  devBypassActive?: boolean;
 }): Promise<CheckIn> {
   const validationError = validateCheckInForm(params.mode, params.fields);
   if (validationError) throw new Error(validationError);
+
+  if (params.devBypassActive && !params.session) {
+    return saveDevLocalCheckIn({
+      userId: params.userId,
+      venueId: params.venueId,
+      mode: params.mode,
+      groupSize: params.groupSize,
+    });
+  }
+
+  if (!params.session) {
+    throw new Error('Sign in with Apple, Google, or phone to check in.');
+  }
+
+  await ensureProfile();
 
   await clearOwnCheckIns(params.userId);
 
@@ -142,7 +220,9 @@ export async function submitCheckIn(params: {
     ...buildModeProfileUpdate(params.mode, params.fields),
   };
 
-  const { error: profileError } = await supabase.from('profiles').upsert(profilePatch);
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .upsert(profilePatch, { onConflict: 'id' });
   if (profileError) throw profileError;
 
   const expiresAt = new Date(
@@ -163,4 +243,32 @@ export async function submitCheckIn(params: {
 
   if (checkInError) throw checkInError;
   return data as CheckIn;
+}
+
+export async function updateActiveCheckInMode(
+  userId: string,
+  mode: IntentMode,
+): Promise<CheckIn | null> {
+  const { data, error } = await supabase
+    .from('check_ins')
+    .update({ mode })
+    .eq('user_id', userId)
+    .gt('expires_at', new Date().toISOString())
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as CheckIn) ?? null;
+}
+
+/** Updates active check-in mode (Supabase or dev-local storage). */
+export async function changeActiveCheckInMode(
+  userId: string,
+  mode: IntentMode,
+  opts?: { devBypassActive?: boolean },
+): Promise<CheckIn | null> {
+  if (opts?.devBypassActive) {
+    return updateDevLocalCheckInMode(userId, mode);
+  }
+  return updateActiveCheckInMode(userId, mode);
 }

@@ -14,9 +14,8 @@ if [[ ! -f .env ]]; then
 fi
 
 # shellcheck disable=SC1091
-set -a
-source .env
-set +a
+source "$(dirname "$0")/load-dotenv.sh"
+load_dotenv .env
 
 missing=0
 for var in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY; do
@@ -61,6 +60,14 @@ done
 
 if grep -qE '^EXPO_PUBLIC_.*SECRET=' .env 2>/dev/null; then
   echo "FAIL: EXPO_PUBLIC_*SECRET in .env — remove; use Supabase Dashboard for OAuth secrets"
+  missing=1
+fi
+
+echo ""
+echo "--- EXPO_PUBLIC safety ---"
+if bash "$(dirname "$0")/check-expo-public-safety.sh" .env; then
+  echo "OK: EXPO_PUBLIC_ vars pass safety check"
+else
   missing=1
 fi
 

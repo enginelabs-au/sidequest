@@ -1,6 +1,9 @@
+import { isDevTestVenue, isDevTestVenueCheckInEnabled } from '@/constants/devVenues';
 import { VENUE_MAX_DISTANCE_KM } from '@/constants/theme';
-import { performCheckout } from '@/lib/checkout';
+import { mapTabRoute } from '@/lib/mapNavigation';
+import { performCheckout, type CheckoutMeta } from '@/lib/checkout';
 import { haversineDistanceKm, type Coordinates } from '@/lib/geo';
+import type { IntentMode } from '@/types/database';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
@@ -8,6 +11,9 @@ import { Alert } from 'react-native';
 
 type AutoCheckoutOptions = {
   venueCoords: Coordinates | null;
+  venueName?: string | null;
+  venueId?: string | null;
+  mode?: IntentMode | null;
   expiresAt: string | null;
   enabled?: boolean;
   refreshCheckIn: () => Promise<void>;
@@ -19,6 +25,9 @@ type AutoCheckoutOptions = {
  */
 export function useAutoCheckout({
   venueCoords,
+  venueName,
+  venueId,
+  mode,
   expiresAt,
   enabled = true,
   refreshCheckIn,
@@ -31,16 +40,20 @@ export function useAutoCheckout({
       if (checkingOut.current) return;
       checkingOut.current = true;
       try {
-        await performCheckout(refreshCheckIn);
+        const meta: CheckoutMeta | undefined =
+          venueId && venueName && mode
+            ? { venueId, venueName, mode }
+            : undefined;
+        await performCheckout(refreshCheckIn, meta);
         console.info('Auto checkout:', reason);
         if (reason === 'expired') {
           Alert.alert(
             'Session ended',
             "Your check-in expired. You're invisible again.",
-            [{ text: 'OK', onPress: () => router.replace('/(onboarding)/venue') }],
+            [{ text: 'OK', onPress: () => router.replace(mapTabRoute()) }],
           );
         } else {
-          router.replace('/(onboarding)/venue');
+          router.replace(mapTabRoute());
         }
       } catch (e) {
         console.warn('Auto checkout failed', e);
@@ -48,7 +61,7 @@ export function useAutoCheckout({
         checkingOut.current = false;
       }
     },
-    [refreshCheckIn, router],
+    [refreshCheckIn, router, venueId, venueName, mode],
   );
 
   useEffect(() => {
@@ -64,8 +77,11 @@ export function useAutoCheckout({
     return () => clearTimeout(timer);
   }, [enabled, expiresAt, runAutoCheckout]);
 
+  const skipGeoCheckout =
+    isDevTestVenueCheckInEnabled() && !!venueName && isDevTestVenue({ name: venueName });
+
   useEffect(() => {
-    if (!enabled || !venueCoords) return;
+    if (!enabled || !venueCoords || skipGeoCheckout) return;
 
     let subscription: Location.LocationSubscription | null = null;
     let cancelled = false;
@@ -97,5 +113,5 @@ export function useAutoCheckout({
       cancelled = true;
       subscription?.remove();
     };
-  }, [enabled, venueCoords, runAutoCheckout]);
+  }, [enabled, venueCoords, skipGeoCheckout, runAutoCheckout]);
 }

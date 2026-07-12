@@ -1,34 +1,46 @@
-# Supabase Edge Functions (deferred)
+# Supabase Edge Functions
 
-Side Quest MVP uses **client-side moderation** only. Server-side AI moderation is planned for post-MVP.
+## Deployed
 
-## Planned functions
+### `places-search`
 
-### `moderate-report` (placeholder)
+Proxies **Google Places API (New)** for the Social Radar search bar. Keeps the Places API key server-side.
 
-- **Trigger:** Database webhook on `reports` insert, or client invoke after `submitSafetyReport`
-- **Input:** `report_id`, `reason`, `details`, optional message excerpts
-- **Action:** OpenAI Moderation API classification; store result in a future `report_reviews` table
-- **Secrets:** `OPENAI_API_KEY` — server-only, never in the mobile client (see `.env.example`)
+| Action | Body | Response |
+|--------|------|----------|
+| `autocomplete` | `{ action, input, sessionToken? }` | `{ suggestions: PlaceSuggestion[] }` |
+| `details` | `{ action, placeId }` | `{ location: PlaceLocation }` |
 
-### `moderate-message` (placeholder)
+**Secret (Supabase Dashboard or CLI):** `GOOGLE_MAPS_PLACES_API_KEY`
 
-- **Trigger:** Database webhook on `messages` insert
-- **Action:** Secondary scan beyond client `containsBlockedContent` in `lib/moderation.ts`
-- **Fallback:** MVP relies on client filter + user reports
+**Client:** `lib/googlePlaces.ts` → `supabase.functions.invoke('places-search', …)`
 
-## Deployment (Phase 9+)
+**Deploy:**
 
 ```bash
-supabase functions new moderate-report
-# Implement handler; deploy with:
-supabase functions deploy moderate-report --project-ref <ref>
+# From repo root — set secret once (use GOOGLE_MAPS_PLACES_API_KEY from .env)
+supabase secrets set GOOGLE_MAPS_PLACES_API_KEY="<your-places-key>" --project-ref xzfxkybnjzlpguespkco
+
+supabase functions deploy places-search --project-ref xzfxkybnjzlpguespkco
 ```
 
-Not deployed in Phase 8. Reports are stored via RLS `reports_insert_own` for manual review.
+`verify_jwt = false` so search works with simulator dev bypass (anon invoke). The Google key never ships in the mobile bundle.
+
+---
+
+## Planned (post-MVP)
+
+### `moderate-report`
+
+- **Trigger:** Database webhook on `reports` insert
+- **Secrets:** `OPENAI_API_KEY`
+
+### `moderate-message`
+
+- **Trigger:** Database webhook on `messages` insert
 
 ## Related
 
-- Client filter: [`lib/moderation.ts`](../../lib/moderation.ts)
-- Report API: [`lib/safety.ts`](../../lib/safety.ts)
-- Phase 8 docs: [`docs/PHASE8_SAFETY.md`](../../docs/PHASE8_SAFETY.md)
+- Maps setup: [`docs/GOOGLE_MAPS_SETUP.md`](../../docs/GOOGLE_MAPS_SETUP.md)
+- Client: [`lib/googlePlaces.ts`](../../lib/googlePlaces.ts)
+- UI: [`components/MapSearchBar.tsx`](../../components/MapSearchBar.tsx)

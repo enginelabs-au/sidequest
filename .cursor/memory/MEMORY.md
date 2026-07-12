@@ -14,11 +14,19 @@ Use user-run steps only when:
 ## Project index — Side Quest
 
 - **Product:** venue-anchored, time-limited, intent-segmented social discovery (Expo + Supabase).
+- **UI theme:** **Active Open To mode drives app-wide primary** (buttons, tab bar, accents, chat bubbles) — friends purple `#4E1A7A`, networking blue `#2563EB`, dating pink `#EC4899`. Brand purple `#371259` is app icon / friends canonical only, not global default. Activity/inbox keep varied semantic colors (wave, request, check-in, reply). v5 ref `design/ui/sidequest-social-v5-inbox-activity-discovery.png`; v6 settings ref `design/ui/sidequest-settings-profile-v6-reference.png`. **Main tabs:** Home (discovery deck), Alerts, Map (coral pin FAB), Check-ins, Profile. Solid opaque UI — no glass/transparency.
+- **App routes:** No bracket route groups — `app/auth/`, `app/onboarding/`, `app/main/tabs/` (paths like `/main/tabs/home`). Canonical list: `lib/routes.ts`. Chat back button → **Inbox**.
+- **Semantic colors:** Alerts by type (wave purple, request pink, check-in green, reply blue). Check-ins tab: green active venue, muted purple past. Inbox requests pink. Wave button: green 3D → yellow 30s timer → red Un-Wave. First chat message uses same 30s timer.
+- **Home / room deck:** View Room = same `RoomFeedScreen` as Home tab. Check-in status tag (green = checked in, coral = not). Green `WaveButton` with wave animation; tap profile photo/name for public profile (no separate profile button).
+- **Solo check-in:** Never gate check-in or room access on other users being present. Empty room = valid state; positive copy + self in roster when checked in alone.
+- **Attendee counters:** All viewer-facing presence/mode/map counts exclude the signed-in user when they are checked in at that venue — counts are **other people only** (`lib/venuePresence.ts`).
+- **Social actions require check-in:** Waving and messaging blocked until checked in — `useCheckInGate` / `promptCheckInRequired` with **Go to Map** (`lib/checkInGate.ts`).
+- **Device rebuilds:** After substantive changes, rebuild to connected iOS devices (`npx expo run:ios --device "<name>"`).
 - **Plan:** `docs/plans/side_quest_phase_0_50bd8a65.plan.md`
 - **Runbook:** `.cursor/memory/runbooks/sidequest-mvp.md`
 - **Env / launch:** `docs/FINAL_CHECKLIST.md`, `docs/PHASE9_SETUP.md`, `docs/PHASE9_LAUNCH.md`, `scripts/verify-env.sh`, `.env.example`
 - **Schema:** `supabase/migrations/` (profiles, venues, check_ins, connections, blocks, messages, reports, RLS, RPCs)
-- **App routes:** `app/(auth)`, `app/(onboarding)`, `app/(main)`
+- **Maps / Social Radar:** `docs/GOOGLE_MAPS_SETUP.md`; Places via Edge Function `places-search` + secret `GOOGLE_MAPS_PLACES_API_KEY`; native keys `GOOGLE_MAPS_IOS_API_KEY`, `GOOGLE_MAPS_ANDROID_API_KEY`.
 - **Remote DB:** not linked yet — user creates Supabase project + `.env`; then `npm run verify:env` → `db push`
 
 ## Primary working memory role

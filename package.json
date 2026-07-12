@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.110.1",
     "expo": "~57.0.4",
     "expo-auth-session": "^57.0.2",
@@ -21,6 +21,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.0",
+    "react-native-maps": "1.27.2",
     "react-native-reanimated": "4.5.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
@@ -34,13 +35,16 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "db:types": "supabase gen types typescript --linked > types/database.generated.ts",
     "verify:env": "bash scripts/verify-env.sh",
-    "verify:connections": "bash scripts/verify-connections.sh"
+    "verify:connections": "bash scripts/verify-connections.sh",
+    "test:oauth": "node scripts/test-oauth-providers.mjs",
+    "generate:apple-secret": "node scripts/generate-apple-secret.mjs",
+    "generate:icons": "python3 scripts/generate-app-icons.py"
   },
   "private": true
 }

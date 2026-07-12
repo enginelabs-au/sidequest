@@ -63,6 +63,7 @@ Run `npm run verify:connections` — Supabase REST/Auth, DB smoke, legal URL rea
 - [x] `supabase migration list --linked` — migrations synced (incl. legacy `20260709064007`)
 - [x] Postgres smoke — 5 tables + 3 RPCs + 5 venues
 - [x] `npm run db:types` (optional type diff)
+- [x] Agent infra: `verify:env`, `verify:connections`, `test:oauth` (2026-07-10)
 - [ ] ⏳ `npm start` — live auth + venue E2E on device/simulator
 
 ---
@@ -74,8 +75,8 @@ Follow [PHASE9_LAUNCH.md](./PHASE9_LAUNCH.md) in order. Check off as you validat
 ### Phase 3 — Auth ([PHASE3_AUTH](./PHASE3_AUTH.md))
 
 - [ ] ⏳ Phone OTP send + verify
-- [ ] ⏳ Google OAuth → `sidequest://auth/callback`
-- [ ] ⏳ Apple Sign In (iOS)
+- [x] Google OAuth — `npm run test:oauth` redirects to `accounts.google.com` (2026-07-10)
+- [x] Apple OAuth — `npm run test:oauth` redirects to `appleid.apple.com` + Services ID (2026-07-10)
 - [ ] ⏳ Session persists after app kill
 - [ ] ⏳ New user gets `profiles` row
 - [ ] ⏳ No check-in → venue; sign-out → hero

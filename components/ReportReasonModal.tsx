@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui';
-import { colors, radius, spacing } from '@/constants/theme';
+import { Button, Card } from '@/components/ui';
+import { colors, radius, shadows, spacing } from '@/constants/theme';
 import { REPORT_REASONS, type ReportReasonId } from '@/lib/safety';
 import { useEffect, useState } from 'react';
 import {
@@ -56,7 +56,7 @@ export function ReportReasonModal({ visible, reportedLabel, onClose, onSubmit }:
       accessibilityViewIsModal
     >
       <View style={styles.backdrop}>
-        <View style={styles.card}>
+        <Card style={styles.card}>
           <Text style={styles.title}>Report user</Text>
           {reportedLabel ? (
             <Text style={styles.subtitle}>Reporting {reportedLabel}</Text>
@@ -109,7 +109,7 @@ export function ReportReasonModal({ visible, reportedLabel, onClose, onSubmit }:
               accessibilityLabel="Submit report"
             />
           </View>
-        </View>
+        </Card>
       </View>
     </Modal>
   );
@@ -118,16 +118,13 @@ export function ReportReasonModal({ visible, reportedLabel, onClose, onSubmit }:
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     padding: spacing.lg,
   },
   card: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    marginBottom: 0,
+    maxHeight: '80%',
   },
   title: {
     color: colors.text,

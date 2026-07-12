@@ -1,13 +1,13 @@
-# BOOTSTRAP — `.cursor/` configuration tree
+Markdown# BOOTSTRAP — `.cursor/` configuration tree
 
-This file is **`.cursor/BOOTSTRAP.md`**. It defines the **`.cursor/`** layout: **`rules/`**, **`memory/`**, **`skills/`**, and core markdown files; **idempotent** creation of missing paths; and **what to read** at session start and before each turn (system context only).
+This file is **`.cursor/BOOTSTRAP.md`**. It defines the **`.cursor/`** layout: **`rules/`**, **`memory/`**, **`skills/`**, and core markdown files; **idempotent** creation of missing paths; **what to read** at session start; and the **project scaffolding protocol** for new workspaces.
 
 ---
 
 ## 1. Purpose
 
 - **Location:** This specification lives at **`.cursor/BOOTSTRAP.md`**.
-- **Scope:** **Only** the **`.cursor/`** directory at the repository root.
+- **Scope:** The **`.cursor/`** directory at the repository root, plus the initial project scaffolding phase.
 - **Materialize:** Create **missing** directories and files from §3 using the appendices **only when the target file or rule does not exist**.
 - **Idempotent:** Never overwrite existing `USER.md`, `MEMORY.md`, `STATE.md`, `SKILLS.md`, `TOOLS.md`, `memory/**`, `skills/**`, or `rules/*.mdc` that already contain project context—**skip** and keep on-disk content.
 - **Runtime (session start + before every turn):** Load **only** the **system** context defined in `.cursor/AGENTS.md` (read list) and always-on `.cursor/rules/*.mdc`. Do **not** load the full bootstrap appendices each turn; use appendices only when **filling gaps**.
@@ -50,62 +50,35 @@ Create exactly this structure (empty dirs use `.gitkeep` where noted):
     blocker-governance.mdc
     runbook-governance.mdc
     state-and-compactification.mdc
-```
-
-**Notes**
-
-- **`rules/` (required):** Always-on `.mdc` files including **`00-read-cursor-context-first.mdc`**, **`01-per-turn-read-contract.mdc`**, **`working-memory.mdc`**, **`root-canonical.mdc`**, governance rules; YAML `description` + `alwaysApply: true`.
-- **`memory/` (required):** Subdirs `memories/`, `blockers/`, `blockers-fixed/`, `runbooks/` (use `.gitkeep` if empty). Primary working memory file: **`.cursor/memory/MEMORY.md`** (same tree).
-- **`skills/` (required directory):** May be empty initially. Each skill: `.cursor/skills/<skill-id>/` with `SKILL.md` and optional `assets/`, `references/`.
-
----
-
-## 4. Execution steps (materialize **missing** files only)
-
-1. Create any **missing** directories from §3 under `.cursor/` (`memory/…`, `rules/`, `skills/`).
-2. **Appendices A–F:** for each target file, if it **does not exist**, write the fenced template; if it **exists**, **skip** (preserve project content).
-3. **Appendix G:** for each `.cursor/rules/*.mdc`, create from template **only if missing**.
-4. Add `.gitkeep` in empty `memory/*` subdirectories if required by VCS.
-5. **Optional:** `memory/runbooks/agent-config-bootstrap.md` (date + note that `.cursor/` was reconciled from `.cursor/BOOTSTRAP.md`).
-6. Validate §5.
-
-## 4b. Session start and before every turn
-
-1. **Each new user message** = new obligation: use the **Read** tool on `.cursor/AGENTS.md` and the **`AGENTS.md` read list** before other tools (rules alone are not enough; Cursor does not auto-refresh file contents each message). See `.cursor/rules/00-read-cursor-context-first.mdc` and `01-per-turn-read-contract.mdc`.
-2. Apply always-on `.cursor/rules/*.mdc` where the environment loads them.
-3. **Do not** load this entire `BOOTSTRAP.md` each turn—only the **live** `.cursor/` files for operational context.
-
----
-
-## 5. Validation checklist
-
-After materializing missing files, confirm:
-
-- [ ] `.cursor/AGENTS.md` exists and internal paths consistently use `.cursor/`.
-- [ ] All eight rule files exist under `.cursor/rules/` and include YAML frontmatter with `alwaysApply: true`.
-- [ ] `MEMORY.md`, `STATE.md`, and `USER.md` are non-empty (or were skipped because already present).
-- [ ] `SKILLS.md` contains the registry table (may have zero concrete skills).
-- [ ] `TOOLS.md` contains the entry format and tool-selection rule; project-specific tools are **not** required for a valid bootstrap.
-- [ ] No secrets or environment-specific credentials were introduced.
-
----
-
-## 6. Other documentation
-
-Optional handovers elsewhere in the repository may be linked from `.cursor/memory/MEMORY.md` or `skills/*/references/`.
-
----
-
-# Appendices — file bodies (templates)
-
-**Instruction:** After resolving paths to **`.cursor/`**, use fenced blocks **only when creating a missing file**. **Never** overwrite existing project files from an appendix.
-
-## Appendix A — `.cursor/AGENTS.md`
-
-```markdown
-# AGENTS.md
+Notesrules/ (required): Always-on .mdc files including 00-read-cursor-context-first.mdc, 01-per-turn-read-contract.mdc, working-memory.mdc, root-canonical.mdc, governance rules; YAML description + alwaysApply: true.memory/ (required): Subdirs memories/, blockers/, blockers-fixed/, runbooks/ (use .gitkeep if empty). Primary working memory file: .cursor/memory/MEMORY.md (same tree).skills/ (required directory): May be empty initially. Each skill: .cursor/skills/<skill-id>/ with SKILL.md and optional assets/, references/.4. Execution steps (materialize missing files only)Create any missing directories from §3 under .cursor/ (memory/…, rules/, skills/).Appendices A–F: for each target file, if it does not exist, write the fenced template; if it exists, skip (preserve project content).Appendix G: for each .cursor/rules/*.mdc, create from template only if missing.Add .gitkeep in empty memory/* subdirectories if required by VCS.Optional: memory/runbooks/agent-config-bootstrap.md (date + note that .cursor/ was reconciled from .cursor/BOOTSTRAP.md).Validate §5.Scaffolding Halt (CRITICAL): After bootstrapping the .cursor/ directory, check if docs/plans/phase_0_master_plan.md exists in the project root. If it does NOT exist, STOP EXECUTION IMMEDIATELY. Ask the user to provide their product idea and vision so you can execute the "Project Initialization & Scaffolding Protocol" defined in .cursor/AGENTS.md. Do not implement the project scaffolding until the user replies with their idea.4b. Session start and before every turnEach new user message = new obligation: use the Read tool on .cursor/AGENTS.md and the AGENTS.md read list before other tools (rules alone are not enough; Cursor does not auto-refresh file contents each message). See .cursor/rules/00-read-cursor-context-first.mdc and 01-per-turn-read-contract.mdc.Apply always-on .cursor/rules/*.mdc where the environment loads them.Do not load this entire BOOTSTRAP.md each turn—only the live .cursor/ files for operational context.5. Validation checklistAfter materializing missing files, confirm:[ ] .cursor/AGENTS.md exists and internal paths consistently use .cursor/.[ ] All eight rule files exist under .cursor/rules/ and include YAML frontmatter with alwaysApply: true.[ ] MEMORY.md, STATE.md, and USER.md are non-empty (or were skipped because already present).[ ] SKILLS.md contains the registry table (may have zero concrete skills).[ ] TOOLS.md contains the entry format and tool-selection rule; project-specific tools are not required for a valid bootstrap.[ ] No secrets or environment-specific credentials were introduced.[ ] Agent successfully halted to ask for the user's project idea before writing any application code or scaffolding docs.6. Other documentationOptional handovers elsewhere in the repository may be linked from .cursor/memory/MEMORY.md or skills/*/references/.Appendices — file bodies (templates)Instruction: After resolving paths to .cursor/, use fenced blocks only when creating a missing file. Never overwrite existing project files from an appendix.Appendix A — .cursor/AGENTS.mdMarkdown# AGENTS.md
 
 You are operating as an agent in a live project workspace. Your behavior must prioritize continuity, traceability, task state retention, concise memory handling, and reliable resolution of ongoing issues.
+
+## Project Initialization & Scaffolding Protocol
+
+When starting a completely new project (e.g., `docs/plans/phase_0_master_plan.md` does not exist), you must execute the following protocol precisely. You are currently in the planning phase. 
+
+**Step 0: Idea Acquisition**
+Before implementing any initial setup or writing application code, explicitly ask the user for their product idea, vision, and core requirements. Stop and do not proceed until the user has provided this context.
+
+**Step 1: Directory Initialization**
+Once the user provides their idea, generate a `docs/` directory at the root of the project. Within that, generate a `docs/plans/` directory. All architectural planning will live here.
+
+**Step 2: Generate the Phase 0 Master Plan**
+Create a comprehensive document titled `phase_0_master_plan.md` inside `docs/plans/`. This document must serve as the source of truth for the entire lifecycle of the project and include:
+1.  **Product Roadmap & Core Architecture:** Define the exact tech stack required to execute the user's vision.
+2.  **Implementation Phases:** Break the entire build down into sequential, highly granular phases (e.g., Phase 1: Core Scaffolding & Auth, Phase 2: Database & Schema, Phase 3: Core Logic, etc.).
+3.  **Step-by-Step Breakdown:** Under each Phase, list the individual, actionable technical steps required to complete it.
+4.  **Complementary Docs:** Identify and generate any supporting `.md` files needed immediately (e.g., `docs/plans/database_schema.md` or `docs/plans/architecture.md`).
+5.  **Master Checklist & Environment State:** At the bottom of the Phase 0 doc, create a master checklist of all outstanding system tasks. Crucially, list *every single* Environment Variable (API keys, services, endpoints) that the user must set for the project to function.
+
+**Step 3: The Handoff Protocol (CRITICAL)**
+This project will be implemented strictly phase-by-phase. You will not write the plan for Phase 1 until the user instructs you to. 
+At the very bottom of the `phase_0_master_plan.md` document, you MUST generate a specific "Handoff Prompt" inside a markdown code block. This prompt must be written from the user's perspective, instructing you (the AI) to read the Phase 0 plan, transition into Phase 1, and generate the `phase_1_implementation_plan.md`. 
+
+*Note: Every subsequent Phase Plan you write in the future must end with a Master Checklist and a Handoff Prompt for the next consecutive phase.*
+
+---
 
 ## Core operating rules
 
@@ -417,12 +390,7 @@ When a new persistent instruction from the user appears, operationalize it into 
 Favor continuity over re-discovery.
 
 ---
-```
-
-## Appendix B — `.cursor/USER.md`
-
-```markdown
-# USER.md
+Appendix B — .cursor/USER.mdMarkdown# USER.md
 
 Store durable user-specific instructions, preferences, and standing directives here.
 
@@ -443,12 +411,7 @@ Include and maintain:
 Add newly discovered durable preferences to the top of this file.
 
 ---
-```
-
-## Appendix C — `.cursor/STATE.md`
-
-```markdown
-# STATE.md
+Appendix C — .cursor/STATE.mdMarkdown# STATE.md
 
 ## Current Objective
 
@@ -483,12 +446,7 @@ Add newly discovered durable preferences to the top of this file.
 - (timestamp added by executing agent)
 
 ---
-```
-
-## Appendix D — `.cursor/memory/MEMORY.md`
-
-```markdown
-# MEMORY.md
+Appendix D — .cursor/memory/MEMORY.mdMarkdown# MEMORY.md
 
 This file is a concise long-term memory index only.
 
@@ -511,12 +469,7 @@ Initial directives (customize after bootstrap):
 - Compact context proactively before automatic compactification risks losing active state.
 
 ---
-```
-
-## Appendix E — `.cursor/SKILLS.md`
-
-```markdown
-# SKILLS.md
+Appendix E — .cursor/SKILLS.mdMarkdown# SKILLS.md
 
 This file is the **high-level registry** of repeatable procedures for this workspace. Full procedure text, frontmatter, and skill-specific **assets** / **references** live under **`.cursor/skills/<skill-id>/`** (skills live only under `.cursor/skills/` unless you choose to link elsewhere).
 
@@ -558,77 +511,7 @@ For each skill, maintain a directory:
   SKILL.md           # required: metadata + full procedure
   assets/            # optional: templates, snippets
   references/        # optional: links to handovers, upstream SKILL.md, URLs
-```
-
-**Naming:** use **kebab-case** `skill-id` (stable, URL-safe). Example: `deploy-staging`, `run-integration-tests`.
-
-When adding a new skill:
-
-1. Create `.cursor/skills/<skill-id>/` with `SKILL.md` using the structure in **Entry format** below.
-2. Add `assets/` and/or `references/` as needed.
-3. Add a row to **Skill registry** in this file.
-4. Update `.cursor/TOOLS.md` if new tools are involved.
-
----
-
-## Update rules
-
-Update **this registry** and/or a skill folder whenever:
-
-- a new long-standing repeatable process is established
-- a multi-step process is stable enough for reuse
-- a toolchain pattern should be preserved for future reuse
-- the user explicitly requests a skill addition, change, or removal
-
-Remove or revise when:
-
-- the user requests removal
-- the procedure is no longer valid
-- the tooling has materially changed
-
----
-
-## Entry format
-
-### In `.cursor/skills/<skill-id>/SKILL.md` (required sections)
-
-Each `SKILL.md` should include YAML frontmatter (`name`, `description`, optional `metadata`) and sections:
-
-- Purpose  
-- When to use  
-- Inputs  
-- Tools used  
-- Procedure  
-- Expected outcome  
-- Validation  
-- Failure modes / cautions  
-- Related files  
-
----
-
-## Writing standard
-
-All skill bodies must be:
-
-- concise
-- deterministic
-- reusable
-- easy for the agent to execute
-- specific enough to produce the same result again
-
-If a procedure is still experimental or not outcome-stable, keep it in a **runbook** until it can be promoted into `.cursor/skills/<skill-id>/SKILL.md` and listed here.
-
----
-
-## Skill registry
-
-| ID | One-line purpose | Detail |
-|----|------------------|--------|
-| *(none yet — add a row when you create the first skill folder under `skills/`)* | | |
-
----
-```
-
+Naming: use kebab-case skill-id (stable, URL-safe). Example: deploy-staging, run-integration-tests.When adding a new skill:Create .cursor/skills/<skill-id>/ with SKILL.md using the structure in Entry format below.Add assets/ and/or references/ as needed.Add a row to Skill registry in this file.Update .cursor/TOOLS.md if new tools are involved.Update rulesUpdate this registry and/or a skill folder whenever:a new long-standing repeatable process is establisheda multi-step process is stable enough for reusea toolchain pattern should be preserved for future reusethe user explicitly requests a skill addition, change, or removalRemove or revise when:the user requests removalthe procedure is no longer validthe tooling has materially changedEntry formatIn .cursor/skills/<skill-id>/SKILL.md (required sections)Each SKILL.md should include YAML frontmatter (name, description, optional metadata) and sections:PurposeWhen to useInputsTools usedProcedureExpected outcomeValidationFailure modes / cautionsRelated filesWriting standardAll skill bodies must be:concisedeterministicreusableeasy for the agent to executespecific enough to produce the same result againIf a procedure is still experimental or not outcome-stable, keep it in a runbook until it can be promoted into .cursor/skills/<skill-id>/SKILL.md and listed here.Skill registryIDOne-line purposeDetail(none yet — add a row when you create the first skill folder under skills/)
 ## Appendix F — `.cursor/TOOLS.md`
 
 ```markdown
@@ -744,17 +627,7 @@ Prefer built-in project scripts and official tooling over improvised alternative
 ---
 
 *(Add tool entries below using the **Entry format** section when your project’s toolchain is known.)*
-```
-
-## Appendix G — Rule files under `.cursor/rules/`
-
-Each file: use the filename in the heading; content is the fenced block.
-
-
-### G.1 `root-canonical.mdc`
-
-```markdown
----
+Appendix G — Rule files under .cursor/rules/Each file: use the filename in the heading; content is the fenced block.G.1 root-canonical.mdcMarkdown---
 description: Primary canonical hard directives for this workspace
 alwaysApply: true
 ---
@@ -807,13 +680,7 @@ Hard directives:
 - When instructions conflict, preserve the most specific and most recent user instruction unless it violates a higher hard directive already established by the user.
 
 ---
-```
-
-
-### G.2 `core-operating-context.mdc`
-
-```markdown
----
+G.2 core-operating-context.mdcMarkdown---
 description: Core always-on operating context for this workspace
 alwaysApply: true
 ---
@@ -859,13 +726,7 @@ Favor explicit structure over implied memory.
 Do not let important operating instructions remain buried only in chat history.
 
 ---
-```
-
-
-### G.3 `skills-file.mdc`
-
-```markdown
----
+G.3 skills-file.mdcMarkdown---
 description: Activate and maintain SKILLS.md and .cursor/skills/ as the canonical repeatable-procedures system
 alwaysApply: true
 ---
@@ -902,13 +763,7 @@ Update when:
 If a procedure is still too experimental or not yet outcome-stable, keep the history in the relevant runbook instead of promoting it into `.cursor/skills/`.
 
 ---
-```
-
-
-### G.4 `tools-file.mdc`
-
-```markdown
----
+G.4 tools-file.mdcMarkdown---
 description: Activate and maintain TOOLS.md as the canonical tool registry
 alwaysApply: true
 ---
@@ -940,13 +795,7 @@ Do not use `TOOLS.md` for historical logs or state tracking.
 Its purpose is persistent tool awareness and better tool selection.
 
 ---
-```
-
-
-### G.5 `memory-governance.mdc`
-
-```markdown
----
+G.5 memory-governance.mdcMarkdown---
 description: Persistent memory handling and concise memory indexing
 alwaysApply: true
 ---
@@ -995,13 +844,7 @@ Each memory file should preserve concise but complete continuity for a topic or 
 Do not bloat the main memory file with content that belongs in detailed memory files.
 
 ---
-```
-
-
-### G.6 `blocker-governance.mdc`
-
-```markdown
----
+G.6 blocker-governance.mdcMarkdown---
 description: Ongoing unresolved issue tracking and blocker discipline
 alwaysApply: true
 ---
@@ -1039,13 +882,7 @@ Do not archive unresolved blockers early.
 Do not merge unrelated blocker domains into one file.
 
 ---
-```
-
-
-### G.7 `runbook-governance.mdc`
-
-```markdown
----
+G.7 runbook-governance.mdcMarkdown---
 description: Exact resolution logging and repeatable domain runbooks
 alwaysApply: true
 ---
@@ -1086,13 +923,7 @@ If a fix is partial, record that clearly.
 If a fix is validated, record how it was validated.
 
 ---
-```
-
-
-### G.8 `state-and-compactification.mdc`
-
-```markdown
----
+G.8 state-and-compactification.mdcMarkdown---
 description: Live state preservation and proactive context compactification
 alwaysApply: true
 ---
@@ -1172,26 +1003,4 @@ Compression rules:
 Do not compress away anything still active or likely to affect the next turns.
 
 ---
-```
-
-
----
-
-## Appendix H — Optional seed runbook
-
-Create `.cursor/memory/runbooks/agent-config-bootstrap.md` with:
-
-- **domain:** agent configuration / bootstrap
-- **purpose:** record that `BOOTSTRAP.md` was executed
-- **procedure:** link to `.cursor/BOOTSTRAP.md`; note date
-- **validation:** tree matches §3
-
----
-
-## System prompt (short) — for the executing agent
-
-You reconcile **`.cursor/`**: §4 creates **missing** files only; §4b is your **ongoing** read contract. Do not overwrite existing files from appendices. Do not invent secrets.
-
----
-
-*End of BOOTSTRAP.md*
+Appendix H — Optional seed runbookCreate .cursor/memory/runbooks/agent-config-bootstrap.md with:domain: agent configuration / bootstrappurpose: record that BOOTSTRAP.md was executedprocedure: link to .cursor/BOOTSTRAP.md; note datevalidation: tree matches §3System prompt (short) — for the executing agentYou reconcile .cursor/: §4 creates missing files only; §4b is your ongoing read contract. Do not overwrite existing files from appendices. Do not invent secrets.CRITICAL HALT INSTRUCTION: If you are reading this BOOTSTRAP.md for the first time in a new workspace, you MUST execute Step 7 of the Execution Steps. After building the .cursor/ layout, you MUST STOP and explicitly ask the user for their product idea before scaffolding any architecture documents or code.

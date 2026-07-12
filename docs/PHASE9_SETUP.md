@@ -68,8 +68,21 @@ supabase migration list --linked   # 6 migrations, Local = Remote
 
 ## 4. Apple Developer (manual, iOS)
 
-1. Register App ID `au.enginelabs.sidequest` → enable Sign in with Apple
-2. Create Services ID and key for Supabase Apple provider
+Side Quest uses Supabase **browser OAuth** for Apple — you need **three separate** console artifacts. The App ID wizard does **not** create a signing key.
+
+Full steps: [docs/PHASE3_AUTH.md](./PHASE3_AUTH.md) § Apple Sign In.
+
+| Step | Apple docs | Output |
+|------|------------|--------|
+| 1 | Membership | Team ID |
+| 2 | [App IDs](https://developer.apple.com/account/resources/identifiers/list) — enable as **Primary** | `au.enginelabs.sidequest` |
+| 3 | [Register Services ID](https://developer.apple.com/help/account/identifiers/register-a-services-id/) — register only | e.g. `au.enginelabs.sidequest.web` |
+| 4 | [Configure for web](https://developer.apple.com/help/account/configure-app-capabilities/configure-sign-in-with-apple-for-the-web/) — open Services ID **from list** | Domain + Return URL → Supabase callback |
+| 5 | [Keys](https://developer.apple.com/account/resources/authkeys/list) | `.p8` + Key ID |
+| 6 | Supabase secret generator | JWT → Supabase Apple provider |
+
+Step 4 is the most common failure point — see [PHASE3_AUTH.md](./PHASE3_AUTH.md) § Step 4.
+
 
 ## 5. Live validation (after push + auth)
 

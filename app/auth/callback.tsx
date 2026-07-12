@@ -62,7 +62,7 @@ export default function AuthCallbackScreen() {
   return (
     <Screen>
       {error ? <ErrorBanner message={error} /> : null}
-      <Button title="Back to sign in" onPress={() => router.replace('/(auth)')} />
+      <Button title="Back to sign in" onPress={() => router.replace('/auth')} />
     </Screen>
   );
 }

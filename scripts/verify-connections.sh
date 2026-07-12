@@ -13,9 +13,8 @@ if [[ ! -f .env ]]; then
 fi
 
 # shellcheck disable=SC1091
-set -a
-source .env
-set +a
+source "$(dirname "$0")/load-dotenv.sh"
+load_dotenv .env
 
 fail=0
 warn=0
@@ -45,6 +44,10 @@ fi
 
 if grep -qE '^SUPABASE_SERVICE_ROLE_KEY=' .env 2>/dev/null; then
   fail_if "SUPABASE_SERVICE_ROLE_KEY uncommented in .env — remove; never use in client"
+fi
+
+if ! bash "$(dirname "$0")/check-expo-public-safety.sh" .env; then
+  fail_if "Unsafe or unexpected EXPO_PUBLIC_ variables in .env (run scripts/check-expo-public-safety.sh)"
 fi
 
 # --- Supabase REST (venues) ---

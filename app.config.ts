@@ -11,7 +11,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: process.env.EXPO_PUBLIC_APP_SCHEME ?? 'sidequest',
-  userInterfaceStyle: 'dark',
+  userInterfaceStyle: 'light',
   ios: {
     supportsTablet: false,
     bundleIdentifier: APP_ID,
@@ -25,7 +25,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: APP_ID,
     adaptiveIcon: {
-      backgroundColor: '#0f0f14',
+      backgroundColor: '#371259',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
@@ -54,7 +54,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         image: './assets/images/splash-icon.png',
         resizeMode: 'contain',
-        backgroundColor: '#0f0f14',
+        backgroundColor: '#371259',
+      },
+    ],
+    [
+      'react-native-maps',
+      {
+        iosGoogleMapsApiKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
+        androidGoogleMapsApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
       },
     ],
   ],
@@ -68,5 +75,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     appScheme: process.env.EXPO_PUBLIC_APP_SCHEME ?? 'sidequest',
     privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL,
     termsUrl: process.env.EXPO_PUBLIC_TERMS_URL,
+    /** Dev simulator only — omit in production/EAS env; not EXPO_PUBLIC_ */
+    devPlacesApiKey: process.env.DEV_PLACES_API_KEY?.trim() || undefined,
+    devPlacesFallback: process.env.DEV_PLACES_FALLBACK !== 'false',
+    devAuthBypass: process.env.DEV_AUTH_BYPASS === 'true',
+    devAuthEmail: process.env.DEV_AUTH_EMAIL?.trim() || undefined,
+    devAuthPassword: process.env.DEV_AUTH_PASSWORD || undefined,
+    /** Dev only — skip 1 km check-in gate; also on when DEV_AUTH_BYPASS=true */
+    devCheckInBypass:
+      process.env.DEV_CHECKIN_BYPASS === 'true' || process.env.DEV_AUTH_BYPASS === 'true',
   },
 });
